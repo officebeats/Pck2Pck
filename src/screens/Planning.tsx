@@ -745,9 +745,11 @@ export default function Planning() {
                                                     </div>
                                                     <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
                                                         {overdueBills.map(bill => (
-                                                            <div key={bill.id} onClick={() => handleOpenModal(bill)} className={clsx("p-4 flex items-center gap-4 hover:bg-red-50/10 cursor-pointer transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
-                                                                <div className="flex-1 min-w-0">
+                                                            <div key={bill.id} className={clsx("p-4 flex items-center gap-4 hover:bg-red-50/10 transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
+                                                                <div onClick={() => handleOpenModal(bill)} className="cursor-pointer">
+                                                                    <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenModal(bill)}>
                                                                     <div className="flex justify-between items-start">
                                                                         <h4 className="font-bold text-sm text-slate-900 truncate">
                                                                             {bill.isTentative && <span className="mr-1.5 opacity-60 italic text-[10px] uppercase font-black text-slate-400">[Tentative]</span>}
@@ -762,7 +764,23 @@ export default function Planning() {
                                                                         <span className="text-[10px] text-slate-400 font-medium">Overdue by {Math.ceil((today.getTime() - bill.dueDate.getTime()) / (1000 * 3600 * 24))} days</span>
                                                                     </div>
                                                                 </div>
-                                                                <span className="material-symbols-outlined text-slate-300 group-hover:text-slate-500 transition-colors">chevron_right</span>
+                                                                {/* Quick Action Buttons */}
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setDiscussingBillId(bill.id); }}
+                                                                        className="neo-btn size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                        title="Add Comment"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-base">chat_bubble</span>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); markAsPaid(bill.id, bill.amount); showSuccess('Bill Paid', `${bill.name} marked as paid!`); }}
+                                                                        className="neo-btn-primary size-8 rounded-full flex items-center justify-center transition-all active:scale-95"
+                                                                        title="Mark as Paid"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-base">check</span>
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -781,9 +799,11 @@ export default function Planning() {
                                                     {upcomingBills.map(bill => {
                                                         const countdown = getDueCountdown(bill.dueDate);
                                                         return (
-                                                            <div key={bill.id} onClick={() => handleOpenModal(bill)} className={clsx("p-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
-                                                                <div className="flex-1 min-w-0">
+                                                            <div key={bill.id} className={clsx("p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
+                                                                <div onClick={() => handleOpenModal(bill)} className="cursor-pointer">
+                                                                    <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenModal(bill)}>
                                                                     <div className="flex justify-between items-start">
                                                                         <h4 className="font-bold text-sm text-slate-900 truncate">
                                                                             {bill.isTentative && <span className="mr-1.5 opacity-60 italic text-[10px] uppercase font-black text-slate-400">[Tentative]</span>}
@@ -811,7 +831,23 @@ export default function Planning() {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <span className="material-symbols-outlined text-slate-300 group-hover:text-slate-500 transition-colors">chevron_right</span>
+                                                                {/* Quick Action Buttons */}
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setDiscussingBillId(bill.id); }}
+                                                                        className="neo-btn size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                        title="Add Comment"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-base">chat_bubble</span>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); markAsPaid(bill.id, bill.amount); showSuccess('Bill Paid', `${bill.name} marked as paid!`); }}
+                                                                        className="neo-btn-primary size-8 rounded-full flex items-center justify-center transition-all active:scale-95"
+                                                                        title="Mark as Paid"
+                                                                    >
+                                                                        <span className="material-symbols-outlined text-base">check</span>
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         )
                                                     })}

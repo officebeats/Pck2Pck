@@ -216,13 +216,6 @@ export default function BillPayments() {
         </button>
         <h1 className="text-lg font-black leading-tight tracking-tight flex-1 text-center text-slate-900">Bills</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowPaydayModal(true)}
-            className="neo-btn-primary px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md active:scale-95 whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-lg">payments</span>
-            <span className="hidden sm:inline">Deposit</span>
-          </button>
           <button onClick={() => navigate('/planning')} className="neo-btn size-8 flex items-center justify-center rounded-full text-primary shadow-sm active:scale-95 transition-all" title="Plan Paychecks">
             <span className="material-symbols-outlined text-lg font-black">event_repeat</span>
           </button>
