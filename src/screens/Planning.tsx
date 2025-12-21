@@ -1088,18 +1088,17 @@ export default function Planning() {
                                 <div className="pt-4 border-t border-gray-100 space-y-3">
                                     <input type="text" value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Company Name" />
 
-                                    {/* Custom Icon: Emoji or Logo */}
+                                    {/* Icon Picker */}
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Icon (Emoji or Logo URL)</label>
-                                        {/* Quick Emoji Picker */}
-                                        <div className="flex flex-wrap gap-1.5 mb-2">
-                                            {['💡', '💧', '🔥', '📶', '🏠', '🚗', '💳', '🏥', '🎬', '📦', '🛒', '📄'].map(emoji => (
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Icon</label>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {['💡', '💧', '🔥', '📶', '🏠', '🚗', '💳', '🏥', '🎬', '📦', '🛒', '📄', '🏦', '🎓', '💪', '🐾', '👶', '✈️'].map(emoji => (
                                                 <button
                                                     key={emoji}
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, logoUrl: emoji })}
                                                     className={clsx(
-                                                        "size-8 rounded-lg flex items-center justify-center text-lg transition-all",
+                                                        "size-9 rounded-lg flex items-center justify-center text-xl transition-all",
                                                         formData.logoUrl === emoji
                                                             ? "bg-primary/20 ring-2 ring-primary scale-110"
                                                             : "bg-slate-100 hover:bg-slate-200"
@@ -1109,28 +1108,6 @@ export default function Planning() {
                                                 </button>
                                             ))}
                                         </div>
-                                        {/* URL Input + Google Search */}
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={formData.logoUrl}
-                                                onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                                                className="neo-inset flex-1 p-3 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
-                                                placeholder="Emoji or paste logo URL..."
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const searchTerm = formData.companyName || formData.name || 'company';
-                                                    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchTerm + ' logo transparent')}`, '_blank');
-                                                }}
-                                                className="neo-btn px-3 rounded-xl text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5"
-                                                title="Search Google Images"
-                                            >
-                                                <span className="material-symbols-outlined text-lg">image_search</span>
-                                            </button>
-                                        </div>
-                                        <p className="text-[9px] text-slate-400 mt-1">Pick an emoji above, or paste a logo URL</p>
                                     </div>
 
                                     <input type="text" value={formData.accountNumber} onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Account Number" />
@@ -1242,19 +1219,17 @@ export default function Planning() {
                                 />
                             </div>
 
-                            {/* Custom Logo URL */}
-                            {/* Custom Icon: Emoji or Logo */}
+                            {/* Icon Picker */}
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Icon (Emoji or Logo URL)</label>
-                                {/* Quick Emoji Picker for Income */}
-                                <div className="flex flex-wrap gap-1.5 mb-2">
-                                    {['💰', '💵', '💳', '💼', '🏢', '💻', '📈', '🏦', '🏠', '🎁', '🏛️', '🎯'].map(emoji => (
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Icon</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {['💰', '💵', '💳', '💼', '🏢', '💻', '📈', '🏦', '🏠', '🎁', '🏛️', '🎯', '🚗', '📦', '🎓', '🏖️'].map(emoji => (
                                         <button
                                             key={emoji}
                                             type="button"
                                             onClick={() => setIncomeFormData({ ...incomeFormData, logoUrl: emoji })}
                                             className={clsx(
-                                                "size-8 rounded-lg flex items-center justify-center text-lg transition-all",
+                                                "size-9 rounded-lg flex items-center justify-center text-xl transition-all",
                                                 incomeFormData.logoUrl === emoji
                                                     ? "bg-primary/20 ring-2 ring-primary scale-110"
                                                     : "bg-slate-100 hover:bg-slate-200"
@@ -1264,28 +1239,6 @@ export default function Planning() {
                                         </button>
                                     ))}
                                 </div>
-                                {/* URL Input + Google Search */}
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={incomeFormData.logoUrl}
-                                        onChange={(e) => setIncomeFormData({ ...incomeFormData, logoUrl: e.target.value })}
-                                        className="neo-inset flex-1 p-3 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
-                                        placeholder="Emoji or paste logo URL..."
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const searchTerm = incomeFormData.name || 'company';
-                                            window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchTerm + ' logo transparent')}`, '_blank');
-                                        }}
-                                        className="neo-btn px-3 rounded-xl text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5"
-                                        title="Search Google Images"
-                                    >
-                                        <span className="material-symbols-outlined text-lg">image_search</span>
-                                    </button>
-                                </div>
-                                <p className="text-[9px] text-slate-400 mt-1">Pick an emoji above, or paste a logo URL</p>
                             </div>
                         </div>
 
