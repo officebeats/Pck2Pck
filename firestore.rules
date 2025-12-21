@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Bills collection - users can only read/write their own bills
+    match /bills/{billId} {
+      allow read, write: if request.auth != null && 
+                           (resource == null || resource.data.ownerId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
+    }
+    
+    // Income sources collection - users can only read/write their own income
+    match /income_sources/{incomeId} {
+      allow read, write: if request.auth != null && 
+                           (resource == null || resource.data.ownerId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
+    }
+    
+    // Users collection - users can only read/write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
