@@ -1037,21 +1037,26 @@ export default function Planning() {
                                 {['Monthly', 'Every 2 Mo', 'Quarterly', '6 Months', 'Yearly'].includes(formData.frequency) && (
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Due Day of Month</label>
-                                        <div className="neo-inset px-3 rounded-xl">
-                                            <select
-                                                value={formData.dueDay}
-                                                onChange={(e) => {
-                                                    const day = parseInt(e.target.value);
-                                                    setFormData({ ...formData, dueDay: day });
-                                                    setRecurrence({ ...recurrence, byMonthDay: day });
-                                                    setRecurrenceSummary(recurrenceSummary.replace(/day \d+/, `day ${day}`));
-                                                }}
-                                                className="w-full py-3 text-slate-900 text-sm font-bold bg-transparent border-none focus:outline-none"
-                                            >
-                                                {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
-                                                    <option key={day} value={day}>Day {day}</option>
-                                                ))}
-                                            </select>
+                                        <div className="grid grid-cols-7 gap-1.5 p-1">
+                                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                                <button
+                                                    key={day}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setFormData({ ...formData, dueDay: day });
+                                                        setRecurrence({ ...recurrence, byMonthDay: day });
+                                                        setRecurrenceSummary(recurrenceSummary.replace(/day \d+/, `day ${day}`));
+                                                    }}
+                                                    className={clsx(
+                                                        "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center",
+                                                        formData.dueDay === day
+                                                            ? "bg-primary text-white shadow-md scale-110 ring-2 ring-primary/20"
+                                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
+                                                    )}
+                                                >
+                                                    {day}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
