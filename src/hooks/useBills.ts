@@ -41,6 +41,7 @@ export interface Bill {
     isTentative?: boolean; // Inspired by Koffan's "uncertain" items
     // Optional fields
     companyName?: string;
+    logoUrl?: string; // Custom logo URL (overrides auto-detection)
     website?: string;
     username?: string;
     password?: string;

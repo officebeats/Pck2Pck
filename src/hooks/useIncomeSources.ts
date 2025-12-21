@@ -13,6 +13,7 @@ export interface IncomeSource {
     recurrence: RecurrenceRule;
     nextPayday: string; // YYYY-MM-DD
     icon: string;
+    logoUrl?: string; // Custom logo URL (overrides auto-detection)
     ownerId?: string;
 }
 

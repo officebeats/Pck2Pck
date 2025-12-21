@@ -164,7 +164,8 @@ export default function Planning() {
         name: '',
         amount: '',
         nextPayday: new Date().toISOString().split('T')[0],
-        frequencyDisplay: 'Monthly'
+        frequencyDisplay: 'Monthly',
+        logoUrl: ''
     });
     const [isIncomeRepeatPickerOpen, setIsIncomeRepeatPickerOpen] = useState(false);
     const [incomeRecurrence, setIncomeRecurrence] = useState<RecurrenceRule>({ type: 'monthly' });
@@ -193,7 +194,8 @@ export default function Planning() {
         website: '',
         notes: '',
         owner: 'Joint',
-        isTentative: false
+        isTentative: false,
+        logoUrl: ''
     });
     const [recurrence, setRecurrence] = useState<RecurrenceRule>({ type: 'monthly', byMonthDay: 1 });
     const [recurrenceSummary, setRecurrenceSummary] = useState('Monthly on day 1');
@@ -376,7 +378,8 @@ export default function Planning() {
                 accountNumber: bill.accountNumber || '',
                 notes: bill.notes || '',
                 owner: bill.owner || 'Joint',
-                isTentative: bill.isTentative || false
+                isTentative: bill.isTentative || false,
+                logoUrl: bill.logoUrl || ''
             });
             if (bill.recurrence) {
                 setRecurrence(bill.recurrence);
@@ -404,7 +407,8 @@ export default function Planning() {
                 accountNumber: '',
                 notes: '',
                 owner: 'Joint',
-                isTentative: false
+                isTentative: false,
+                logoUrl: ''
             });
             setRecurrence({ type: 'monthly', byMonthDay: 1 });
             setRecurrenceSummary('Monthly on day 1');
@@ -437,6 +441,7 @@ export default function Planning() {
         const newBillData = {
             name: formData.name,
             companyName: formData.companyName,
+            logoUrl: formData.logoUrl || undefined,
             amount: numAmount,
             recurrence: recurrence,
             recurrenceSummary: recurrenceSummary,
@@ -522,7 +527,8 @@ export default function Planning() {
                 name: source.name,
                 amount: source.amount.toString(),
                 nextPayday: source.nextPayday,
-                frequencyDisplay: source.frequencyDisplay
+                frequencyDisplay: source.frequencyDisplay,
+                logoUrl: source.logoUrl || ''
             });
             setIncomeRecurrence(source.recurrence || { type: 'monthly' });
             setIncomeRecurrenceSummary(source.frequencyDisplay || 'Monthly');
@@ -536,7 +542,8 @@ export default function Planning() {
                 name: '',
                 amount: '',
                 nextPayday: `${year}-${month}-${day}`,
-                frequencyDisplay: 'Every 2 weeks'
+                frequencyDisplay: 'Every 2 weeks',
+                logoUrl: ''
             });
             setIncomeRecurrence({ type: 'custom', interval: 2, unit: 'week' });
             setIncomeRecurrenceSummary('Every 2 weeks');
@@ -563,7 +570,8 @@ export default function Planning() {
                 nextPayday: incomeFormData.nextPayday,
                 frequencyDisplay: incomeRecurrenceSummary,
                 recurrence: incomeRecurrence,
-                icon: 'attach_money'
+                icon: 'attach_money',
+                logoUrl: incomeFormData.logoUrl || undefined
             };
 
             if (editingIncomeId) {
@@ -738,7 +746,7 @@ export default function Planning() {
                                                     <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
                                                         {overdueBills.map(bill => (
                                                             <div key={bill.id} onClick={() => handleOpenModal(bill)} className={clsx("p-4 flex items-center gap-4 hover:bg-red-50/10 cursor-pointer transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
+                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex justify-between items-start">
                                                                         <h4 className="font-bold text-sm text-slate-900 truncate">
@@ -774,7 +782,7 @@ export default function Planning() {
                                                         const countdown = getDueCountdown(bill.dueDate);
                                                         return (
                                                             <div key={bill.id} onClick={() => handleOpenModal(bill)} className={clsx("p-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
+                                                                <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex justify-between items-start">
                                                                         <h4 className="font-bold text-sm text-slate-900 truncate">
@@ -830,7 +838,7 @@ export default function Planning() {
                     <div className="space-y-4 animate-fade-in">
                         {incomeSources.sort((a, b) => new Date(a.nextPayday).getTime() - new Date(b.nextPayday).getTime()).map(source => (
                             <div key={source.id} onClick={() => handleOpenIncomeModal(source)} className="neo-card p-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 transition-colors">
-                                <CompanyLogo name={source.name} size="md" fallbackIcon="payments" />
+                                <CompanyLogo name={source.name} customLogoUrl={source.logoUrl} size="md" fallbackIcon="payments" />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start mb-1">
                                         <h4 className="font-bold text-base text-slate-900 truncate">{source.name}</h4>
@@ -1043,6 +1051,33 @@ export default function Planning() {
                                 </div>
                                 <div className="pt-4 border-t border-gray-100 space-y-3">
                                     <input type="text" value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Company Name" />
+
+                                    {/* Custom Logo URL */}
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Custom Logo (Optional)</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="url"
+                                                value={formData.logoUrl}
+                                                onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                                                className="neo-inset flex-1 p-3 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
+                                                placeholder="Paste logo URL here..."
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const searchTerm = formData.companyName || formData.name || 'company';
+                                                    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchTerm + ' logo transparent')}`, '_blank');
+                                                }}
+                                                className="neo-btn px-3 rounded-xl text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5"
+                                                title="Search Google Images"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">image_search</span>
+                                            </button>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-1">Click the search icon, then right-click a logo → Copy image address</p>
+                                    </div>
+
                                     <input type="text" value={formData.accountNumber} onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Account Number" />
                                     <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none resize-none h-24" placeholder="Notes..."></textarea>
                                 </div>
@@ -1150,6 +1185,32 @@ export default function Planning() {
                                     onChange={(e) => setIncomeFormData({ ...incomeFormData, nextPayday: e.target.value })}
                                     className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
                                 />
+                            </div>
+
+                            {/* Custom Logo URL */}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Custom Logo (Optional)</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="url"
+                                        value={incomeFormData.logoUrl}
+                                        onChange={(e) => setIncomeFormData({ ...incomeFormData, logoUrl: e.target.value })}
+                                        className="neo-inset flex-1 p-3 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
+                                        placeholder="Paste logo URL here..."
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const searchTerm = incomeFormData.name || 'company';
+                                            window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchTerm + ' logo transparent')}`, '_blank');
+                                        }}
+                                        className="neo-btn px-3 rounded-xl text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5"
+                                        title="Search Google Images"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">image_search</span>
+                                    </button>
+                                </div>
+                                <p className="text-[9px] text-slate-400 mt-1">Click the search icon, then right-click a logo → Copy image address</p>
                             </div>
                         </div>
 

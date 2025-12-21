@@ -5,6 +5,7 @@ import { getCompanyLogo, getFallbackIcon } from '@/lib/logoFetcher';
 interface CompanyLogoProps {
     name: string;
     companyName?: string;
+    customLogoUrl?: string; // If provided, bypasses auto-detection
     size?: 'sm' | 'md' | 'lg';
     fallbackIcon?: string;
     className?: string;
@@ -21,10 +22,12 @@ const SIZE_MAP = {
  * 
  * Displays a company logo fetched automatically based on the bill/income name,
  * with graceful fallback to Material Icons if no logo is found.
+ * If customLogoUrl is provided, uses that directly.
  */
 export default function CompanyLogo({
     name,
     companyName,
+    customLogoUrl,
     size = 'md',
     fallbackIcon,
     className
@@ -36,7 +39,15 @@ export default function CompanyLogo({
     const sizeConfig = SIZE_MAP[size];
 
     useEffect(() => {
-        // Try company name first, then fall back to bill name
+        // If custom logo is provided, use it directly
+        if (customLogoUrl) {
+            setLogoUrl(customLogoUrl);
+            setHasError(false);
+            setIsLoading(false);
+            return;
+        }
+
+        // Otherwise, try auto-detection
         const searchTerm = companyName || name;
         const result = getCompanyLogo(searchTerm, sizeConfig.faviconSize);
 
@@ -48,7 +59,7 @@ export default function CompanyLogo({
             setHasError(true);
         }
         setIsLoading(false);
-    }, [name, companyName, sizeConfig.faviconSize]);
+    }, [name, companyName, customLogoUrl, sizeConfig.faviconSize]);
 
     const handleImageError = () => {
         setHasError(true);
