@@ -11,6 +11,7 @@ import Calendar from '../components/Calendar';
 import { isPast, isToday, isFuture, startOfDay, isSameDay } from 'date-fns';
 import { useToast, getErrorMessage } from '@/components/Toast';
 import CompanyLogo from '@/components/CompanyLogo';
+import CompactBillCard from '@/components/CompactBillCard';
 
 // --- Types & Interfaces ---
 
@@ -131,7 +132,7 @@ export default function Planning() {
     const { members, isSoloMode } = useHousehold();
 
     // --- Persistent State for Bills ---
-    const { bills: firestoreBills, addBill, updateBill, deleteBill, addBillComment, batchUpdateBills } = useBills();
+    const { bills: firestoreBills, addBill, updateBill, deleteBill, addBillComment, batchUpdateBills, markAsPaid } = useBills();
 
     // --- Persistent State for Income ---
     const { sources: incomeSources, addSource, updateSource, deleteSource } = useIncomeSources();
@@ -163,6 +164,7 @@ export default function Planning() {
     const [incomeFormData, setIncomeFormData] = useState({
         name: '',
         amount: '',
+        dueDay: new Date().getDate(),
         nextPayday: new Date().toISOString().split('T')[0],
         frequencyDisplay: 'Monthly',
         logoUrl: ''
@@ -526,6 +528,7 @@ export default function Planning() {
             setIncomeFormData({
                 name: source.name,
                 amount: source.amount.toString(),
+                dueDay: new Date(source.nextPayday + 'T12:00:00').getDate(),
                 nextPayday: source.nextPayday,
                 frequencyDisplay: source.frequencyDisplay,
                 logoUrl: source.logoUrl || ''
@@ -541,6 +544,7 @@ export default function Planning() {
             setIncomeFormData({
                 name: '',
                 amount: '',
+                dueDay: today.getDate(),
                 nextPayday: `${year}-${month}-${day}`,
                 frequencyDisplay: 'Every 2 weeks',
                 logoUrl: ''
@@ -564,10 +568,19 @@ export default function Planning() {
         }
 
         try {
+            // Calculate nextPayday based on selected dueDay
+            const today = new Date();
+            let targetDate = new Date(today.getFullYear(), today.getMonth(), incomeFormData.dueDay);
+
+            // If the date is in the past, move to next possible occurrence
+            if (targetDate < startOfDay(today)) {
+                targetDate.setMonth(targetDate.getMonth() + 1);
+            }
+
             const data = {
                 name: incomeFormData.name,
                 amount: numAmount,
-                nextPayday: incomeFormData.nextPayday,
+                nextPayday: targetDate.toISOString().split('T')[0],
                 frequencyDisplay: incomeRecurrenceSummary,
                 recurrence: incomeRecurrence,
                 icon: 'attach_money',
@@ -611,45 +624,45 @@ export default function Planning() {
         <div className="relative flex h-auto min-h-screen w-full flex-col bg-background-light text-slate-900 font-sans transition-colors duration-200">
             {/* Header */}
             <div className="sticky top-0 z-20 flex flex-col bg-background-light/95 backdrop-blur-md border-b border-white/40 transition-colors">
-                <div className="flex items-center p-4 pb-2 justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => navigate(-1)} className="neo-btn flex size-9 shrink-0 items-center justify-center text-slate-800 rounded-full active:scale-95 transition-all">
-                            <span className="material-symbols-outlined text-xl">arrow_back_ios_new</span>
-                        </button>
-                        <h1 className="text-lg font-black leading-tight tracking-tight text-slate-900">Strategic Overview</h1>
-                    </div>
+                <div className="flex items-center p-3 pb-1.5 justify-between">
                     <div className="flex items-center gap-2">
+                        <button onClick={() => navigate(-1)} className="neo-btn flex size-8 shrink-0 items-center justify-center text-slate-800 rounded-full active:scale-95 transition-all">
+                            <span className="material-symbols-outlined text-base">arrow_back_ios_new</span>
+                        </button>
+                        <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">Strategic Overview</h1>
+                    </div>
+                    <div className="flex items-center gap-1.5">
                         {viewMode === 'bills' && bills.length > 0 && (
-                            <button onClick={autoAssignBills} className="neo-btn px-3 py-2 flex items-center gap-1.5 rounded-full text-slate-500 hover:text-primary active:scale-95 transition-all bg-white shadow-sm">
-                                <span className="material-symbols-outlined text-lg">auto_fix_high</span>
-                                <span className="text-[10px] font-black uppercase tracking-wide hidden sm:inline">Auto Optimize</span>
+                            <button onClick={autoAssignBills} className="neo-btn px-2.5 py-1.5 flex items-center gap-1 rounded-full text-slate-500 hover:text-primary active:scale-95 transition-all bg-white shadow-sm border-slate-100">
+                                <span className="material-symbols-outlined text-base">auto_fix_high</span>
+                                <span className="text-[9px] font-black uppercase tracking-wide hidden sm:inline">Auto</span>
                             </button>
                         )}
                         <button
                             onClick={() => viewMode === 'income' ? handleOpenIncomeModal() : handleOpenModal()}
-                            className="neo-btn-primary px-4 py-2 flex items-center gap-2 rounded-full shadow-lg active:scale-95 transition-all text-white"
+                            className="neo-btn-primary px-3 py-1.5 flex items-center gap-1.5 rounded-full shadow-lg active:scale-95 transition-all text-white"
                         >
-                            <span className="material-symbols-outlined text-lg font-black">add</span>
-                            <span className="text-xs font-black uppercase tracking-wide">{viewMode === 'income' ? 'Add Income' : 'Add Bill'}</span>
+                            <span className="material-symbols-outlined text-base font-black">add</span>
+                            <span className="text-[10px] font-black uppercase tracking-wide">{viewMode === 'income' ? 'Add Income' : 'Add Bill'}</span>
                         </button>
                     </div>
                 </div>
 
-                <div className="px-3 pb-3">
-                    <div className="neo-inset flex p-1 rounded-xl">
-                        <button onClick={() => setViewMode('bills')} className={clsx("flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all", viewMode === 'bills' ? "neo-card bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                            <span className="material-symbols-outlined text-sm font-bold">receipt_long</span>
+                <div className="px-2.5 pb-2.5">
+                    <div className="neo-inset flex p-0.5 rounded-lg">
+                        <button onClick={() => setViewMode('bills')} className={clsx("flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all", viewMode === 'bills' ? "neo-card bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                            <span className="material-symbols-outlined text-xs font-bold">receipt_long</span>
                             Bills
                         </button>
-                        <button onClick={() => setViewMode('income')} className={clsx("flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all", viewMode === 'income' ? "neo-card bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                            <span className="material-symbols-outlined text-sm font-bold">attach_money</span>
+                        <button onClick={() => setViewMode('income')} className={clsx("flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all", viewMode === 'income' ? "neo-card bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                            <span className="material-symbols-outlined text-xs font-bold">attach_money</span>
                             Income
                         </button>
                     </div>
                 </div>
             </div>
 
-            <main className="flex-1 p-4 md:p-6 pb-24 space-y-4">
+            <main className="flex-1 p-3 md:p-5 pb-20 space-y-3">
                 {viewMode === 'bills' && (
                     <div className="space-y-4 animate-fade-in">
                         {/* Collapsible Calendar Header */}
@@ -708,19 +721,19 @@ export default function Planning() {
                                     const countTotal = bills.length;
 
                                     return (
-                                        <div className="space-y-2">
+                                        <div className="space-y-1.5">
                                             <div className="flex justify-between items-end px-1">
-                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Monthly Progress</p>
-                                                <p className="text-xs font-black text-primary tracking-tighter">
+                                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly Progress</p>
+                                                <p className="text-[10px] font-black text-primary tracking-tighter">
                                                     {countPaid}/{countTotal} <span className="text-slate-300 mx-1">|</span> {Math.round(percent)}%
                                                 </p>
                                             </div>
-                                            <div className="h-2.5 w-full neo-inset rounded-full bg-slate-100 overflow-hidden p-0.5">
+                                            <div className="h-2 w-full neo-inset rounded-full bg-slate-100 overflow-hidden p-0.5">
                                                 <div className="h-full bg-primary rounded-full transition-all duration-1000 shadow-sm" style={{ width: `${percent}%` }} />
                                             </div>
                                             <div className="flex justify-between px-1">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Settled: ${paidTotal.toLocaleString()}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Total: ${totalAmount.toLocaleString()}</p>
+                                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Settled: ${paidTotal.toLocaleString()}</p>
+                                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Total: ${totalAmount.toLocaleString()}</p>
                                             </div>
                                         </div>
                                     );
@@ -735,122 +748,52 @@ export default function Planning() {
                                     return (
                                         <>
                                             {overdueBills.length > 0 && (
-                                                <div className="space-y-3">
-                                                    <div className="bg-red-600 text-white px-4 py-2 rounded-t-xl flex items-center justify-between shadow-sm">
-                                                        <h3 className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                                                            <span className="material-symbols-outlined text-lg">warning</span>
+                                                <div className="space-y-1.5">
+                                                    <div className="bg-red-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
+                                                        <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                                                            <span className="material-symbols-outlined text-base">warning</span>
                                                             Overdue
                                                         </h3>
-                                                        <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold">{overdueBills.length} Bills</span>
+                                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{overdueBills.length} Bills</span>
                                                     </div>
                                                     <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
                                                         {overdueBills.map(bill => (
-                                                            <div key={bill.id} className={clsx("p-4 flex items-center gap-4 hover:bg-red-50/10 transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <div onClick={() => handleOpenModal(bill)} className="cursor-pointer">
-                                                                    <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenModal(bill)}>
-                                                                    <div className="flex justify-between items-start">
-                                                                        <h4 className="font-bold text-sm text-slate-900 truncate">
-                                                                            {bill.isTentative && <span className="mr-1.5 opacity-60 italic text-[10px] uppercase font-black text-slate-400">[Tentative]</span>}
-                                                                            {bill.name}
-                                                                        </h4>
-                                                                        <div className="text-right">
-                                                                            <p className="font-bold text-sm text-slate-900">${bill.amount.toLocaleString()}</p>
-                                                                            <p className="text-[10px] font-black text-red-500 uppercase tracking-wide">{bill.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1 mt-1">
-                                                                        <span className="text-[10px] text-slate-400 font-medium">Overdue by {Math.ceil((today.getTime() - bill.dueDate.getTime()) / (1000 * 3600 * 24))} days</span>
-                                                                    </div>
-                                                                </div>
-                                                                {/* Quick Action Buttons */}
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); setDiscussingBillId(bill.id); }}
-                                                                        className="neo-btn size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
-                                                                        title="Add Comment"
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-base">chat_bubble</span>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); markAsPaid(bill.id, bill.amount); showSuccess('Bill Paid', `${bill.name} marked as paid!`); }}
-                                                                        className="neo-btn-primary size-8 rounded-full flex items-center justify-center transition-all active:scale-95"
-                                                                        title="Mark as Paid"
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-base">check</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
+                                                            <CompactBillCard
+                                                                key={bill.id}
+                                                                bill={bill}
+                                                                onClick={() => handleOpenModal(bill as any)}
+                                                                onPayClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    markAsPaid(bill.id, bill.amount);
+                                                                    showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                                }}
+                                                            />
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div className="space-y-3">
-                                                <div className="bg-emerald-600 text-white px-4 py-2 rounded-t-xl flex items-center justify-between shadow-sm">
-                                                    <h3 className="font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-lg">calendar_month</span>
+                                            <div className="space-y-1.5">
+                                                <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
+                                                    <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-base">calendar_month</span>
                                                         Upcoming
                                                     </h3>
-                                                    <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold">{upcomingBills.length} Bills</span>
+                                                    <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{upcomingBills.length} Bills</span>
                                                 </div>
                                                 <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
-                                                    {upcomingBills.map(bill => {
-                                                        const countdown = getDueCountdown(bill.dueDate);
-                                                        return (
-                                                            <div key={bill.id} className={clsx("p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors group", bill.isTentative && "opacity-60 grayscale-[0.5]")}>
-                                                                <div onClick={() => handleOpenModal(bill)} className="cursor-pointer">
-                                                                    <CompanyLogo name={bill.name} companyName={bill.companyName} customLogoUrl={bill.logoUrl} size="md" fallbackIcon={bill.isTentative ? 'help_outline' : undefined} />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenModal(bill)}>
-                                                                    <div className="flex justify-between items-start">
-                                                                        <h4 className="font-bold text-sm text-slate-900 truncate">
-                                                                            {bill.isTentative && <span className="mr-1.5 opacity-60 italic text-[10px] uppercase font-black text-slate-400">[Tentative]</span>}
-                                                                            {bill.name}
-                                                                        </h4>
-                                                                        <div className="text-right shrink-0 ml-2">
-                                                                            <p className="font-bold text-sm text-slate-900">${bill.amount.toLocaleString()}</p>
-                                                                            <span className={clsx(
-                                                                                "inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full mt-0.5",
-                                                                                countdown.isDueToday && "bg-amber-100 text-amber-700",
-                                                                                countdown.isUrgent && !countdown.isDueToday && "bg-red-100 text-red-600",
-                                                                                !countdown.isUrgent && "bg-slate-100 text-slate-600"
-                                                                            )}>
-                                                                                <span className="material-symbols-outlined text-[10px]">schedule</span>
-                                                                                {countdown.label}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                    {bill.assignedPaycheckId && (
-                                                                        <div className="flex items-center gap-1 mt-1">
-                                                                            <span className="material-symbols-outlined text-[10px] text-slate-400">link</span>
-                                                                            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
-                                                                                {paychecks.find(p => p.id === bill.assignedPaycheckId)?.label || 'Assigned'}
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {/* Quick Action Buttons */}
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); setDiscussingBillId(bill.id); }}
-                                                                        className="neo-btn size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
-                                                                        title="Add Comment"
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-base">chat_bubble</span>
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); markAsPaid(bill.id, bill.amount); showSuccess('Bill Paid', `${bill.name} marked as paid!`); }}
-                                                                        className="neo-btn-primary size-8 rounded-full flex items-center justify-center transition-all active:scale-95"
-                                                                        title="Mark as Paid"
-                                                                    >
-                                                                        <span className="material-symbols-outlined text-base">check</span>
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
+                                                    {upcomingBills.map(bill => (
+                                                        <CompactBillCard
+                                                            key={bill.id}
+                                                            bill={bill}
+                                                            onClick={() => handleOpenModal(bill as any)}
+                                                            onPayClick={(e) => {
+                                                                e.stopPropagation();
+                                                                markAsPaid(bill.id, bill.amount);
+                                                                showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                            }}
+                                                        />
+                                                    ))}
                                                     {upcomingBills.length === 0 && (
                                                         <div className="p-10 flex flex-col items-center justify-center text-center">
                                                             <div className="neo-inset p-4 rounded-full mb-3">
@@ -1213,15 +1156,28 @@ export default function Planning() {
                                 </div>
                             </div>
 
-                            {/* Next Payday */}
+                            {/* Next Payday - Day of Month Grid */}
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">When Is Your Next Payday?</label>
-                                <input
-                                    type="date"
-                                    value={incomeFormData.nextPayday}
-                                    onChange={(e) => setIncomeFormData({ ...incomeFormData, nextPayday: e.target.value })}
-                                    className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
-                                />
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Next Payday (Day of Month)</label>
+                                <div className="grid grid-cols-7 gap-1.5 p-1">
+                                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => {
+                                                setIncomeFormData({ ...incomeFormData, dueDay: day });
+                                            }}
+                                            className={clsx(
+                                                "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center",
+                                                incomeFormData.dueDay === day
+                                                    ? "bg-emerald-600 text-white shadow-md scale-110 ring-2 ring-emerald-600/20"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
+                                            )}
+                                        >
+                                            {day}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Icon Picker */}

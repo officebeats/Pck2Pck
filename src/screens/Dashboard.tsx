@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getNextOccurrences } from '@/lib/recurrence';
 import { useToast, getErrorMessage } from '@/components/Toast';
 import CompanyLogo from '@/components/CompanyLogo';
+import CompactBillCard from '@/components/CompactBillCard';
 
 // --- Interfaces ---
 
@@ -282,35 +283,14 @@ export default function Home() {
         }
     };
 
-    const getStatusColor = (status: Bill['status']) => {
-        switch (status) {
-            case 'overdue': return 'border-red-200 bg-red-50/30';
-            case 'due_today': return 'border-orange-200 bg-orange-50/30';
-            case 'due_soon': return 'border-amber-100';
-            default: return 'border-white/50';
-        }
-    };
-
-    const getStatusLabel = (bill: Bill) => {
-        const due = new Date(bill.dueDate);
-        switch (bill.status) {
-            case 'overdue': return 'Overdue';
-            case 'due_today': return 'Due Today';
-            case 'due_soon':
-                const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                return `Due in ${diff} days`;
-            default: return due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-    };
-
     return (
         <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root text-slate-900 bg-background-light transition-colors duration-200">
 
             {/* --- Header --- */}
-            <div className="flex flex-col md:flex-row md:items-center bg-background-light/90 backdrop-blur-md p-3 pb-2 justify-between sticky top-0 z-20 border-b border-white/40 transition-colors duration-200 md:p-6 md:pb-0 gap-3">
+            <div className="flex flex-col md:flex-row md:items-center bg-background-light/90 backdrop-blur-md p-3 pb-1.5 justify-between sticky top-0 z-20 border-b border-white/40 transition-colors duration-200 md:p-5 md:pb-0 gap-2">
                 <div className="flex items-center justify-between w-full">
                     <div>
-                        <h1 className="text-slate-900 text-lg md:text-2xl font-black leading-tight tracking-tight">Home</h1>
+                        <h1 className="text-slate-900 text-base md:text-xl font-black leading-tight tracking-tight">Home</h1>
                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                             {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {daysUntilPayday !== null ? `${daysUntilPayday} Days to Payday` : 'No upcoming payday'}
                         </p>
@@ -318,9 +298,9 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowPaydayModal(true)}
-                            className="neo-btn-primary px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:brightness-110 active:scale-95 shadow-md"
+                            className="neo-btn-primary px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-1 transition-all hover:brightness-110 active:scale-95 shadow-md"
                         >
-                            <span className="material-symbols-outlined text-lg">attach_money</span>
+                            <span className="material-symbols-outlined text-base">attach_money</span>
                             <span className="hidden sm:inline">Confirm Payday Paycheck</span>
                         </button>
                         <div className="md:hidden">
@@ -332,7 +312,7 @@ export default function Home() {
                 </div>
             </div>
 
-            <main className="flex-1 p-4 pt-4 md:p-6 space-y-3">
+            <main className="flex-1 p-3 pt-3 md:p-5 space-y-2">
 
                 {/* FTUE: First Time User Experience - Prompt to add income first */}
                 {sources.length === 0 && (
@@ -364,40 +344,40 @@ export default function Home() {
                     <>
                         {/* Compact Progress Card */}
                         {/* Coinbase-Style Hero Card */}
-                        <div className="neo-card p-4 relative overflow-hidden group bg-white shadow-lg border-none ring-1 ring-slate-100">
-                            <div className="flex flex-col items-center justify-center text-center gap-1 mb-4 z-10 relative">
-                                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
+                        <div className="neo-card p-3 relative overflow-hidden group bg-white shadow-lg border-none ring-1 ring-slate-100">
+                            <div className="flex flex-col items-center justify-center text-center gap-0.5 mb-3 z-10 relative">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-xs">account_balance_wallet</span>
                                     Left to Spend
                                 </p>
-                                <div className={clsx("text-5xl font-black leading-none tracking-tighter transition-colors", isPositive ? "text-slate-900" : "text-red-500")}>
+                                <div className={clsx("text-4xl font-black leading-none tracking-tighter transition-colors", isPositive ? "text-slate-900" : "text-red-500")}>
                                     {safeToSpend < 0 ? '-' : ''}${Math.abs(safeToSpend).toLocaleString()}
                                 </div>
-                                <p className={clsx("text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full", isPositive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
+                                <p className={clsx("text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full mt-1", isPositive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
                                     {isPositive ? 'On Track' : 'Over Budget'}
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
+                            <div className="grid grid-cols-2 gap-1 border-t border-slate-50 pt-3">
                                 <div
                                     onClick={() => navigate('/planning?view=income')}
-                                    className="flex flex-col items-center gap-0.5 p-2 rounded-xl cursor-pointer hover:bg-emerald-50/50 active:scale-95 transition-all"
+                                    className="flex flex-col items-center gap-0 p-1.5 rounded-xl cursor-pointer hover:bg-emerald-50/50 active:scale-95 transition-all"
                                 >
-                                    <div className="flex items-center gap-1.5 text-emerald-600">
-                                        <span className="material-symbols-outlined text-sm">trending_up</span>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Income</span>
+                                    <div className="flex items-center gap-1 text-emerald-600">
+                                        <span className="material-symbols-outlined text-xs">trending_up</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Income</span>
                                     </div>
-                                    <span className="text-base font-black text-emerald-600">+${projectedIncome.toLocaleString()}</span>
+                                    <span className="text-sm font-black text-emerald-600 tracking-tight">+${projectedIncome.toLocaleString()}</span>
                                 </div>
                                 <div
                                     onClick={() => navigate('/planning?view=bills')}
-                                    className="flex flex-col items-center gap-0.5 p-2 rounded-xl cursor-pointer hover:bg-red-50/50 active:scale-95 transition-all relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-px after:bg-slate-100"
+                                    className="flex flex-col items-center gap-0 p-1.5 rounded-xl cursor-pointer hover:bg-red-50/50 active:scale-95 transition-all relative after:absolute after:left-0 after:top-1.5 after:bottom-1.5 after:w-px after:bg-slate-50"
                                 >
-                                    <div className="flex items-center gap-1.5 text-red-500">
-                                        <span className="material-symbols-outlined text-sm">trending_down</span>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Bills</span>
+                                    <div className="flex items-center gap-1 text-red-500">
+                                        <span className="material-symbols-outlined text-xs">trending_down</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Bills</span>
                                     </div>
-                                    <span className="text-base font-black text-slate-900">-${totalCycleAmount.toLocaleString()}</span>
+                                    <span className="text-sm font-black text-slate-900 tracking-tight">-${totalCycleAmount.toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -413,15 +393,15 @@ export default function Home() {
 
 
                         {/* --- Priority To-Pay --- */}
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between px-1">
-                                <h3 className="text-[10px] font-black text-slate-600 flex items-center gap-2 uppercase tracking-[0.2em]">
-                                    <span className="material-symbols-outlined text-primary text-sm font-bold">priority_high</span>
+                                <h3 className="text-[9px] font-black text-slate-500 flex items-center gap-1.5 uppercase tracking-[0.2em]">
+                                    <span className="material-symbols-outlined text-primary text-xs font-bold">priority_high</span>
                                     Up Next
                                 </h3>
                             </div>
 
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-2">
                                 {sortedBills.length === 0 ? (
                                     <div className="neo-inset flex flex-col items-center justify-center py-8 px-6 rounded-xl border border-dashed border-gray-300">
                                         <span className="material-symbols-outlined text-4xl text-green-500 mb-2">check_circle</span>
@@ -431,74 +411,12 @@ export default function Home() {
                                     </div>
                                 ) : (
                                     sortedBills.map((bill) => (
-                                        <div key={bill.id}
+                                        <CompactBillCard
+                                            key={bill.id}
+                                            bill={bill}
                                             onClick={() => setViewingDetailsBillId(bill.id)}
-                                            className={clsx(
-                                                "neo-card group flex items-center gap-2.5 p-2 transition-all duration-200 cursor-pointer hover:shadow-lg",
-                                                getStatusColor(bill.status)
-                                            )}>
-                                            {/* Logo */}
-                                            <div className="relative">
-                                                <CompanyLogo name={bill.name} companyName={bill.companyName} size="md" />
-                                                {/* Owner Avatar Badge */}
-                                                {bill.owner && bill.owner !== 'Joint' && (
-                                                    <div className="absolute -left-1 -top-1 size-4 rounded-full bg-slate-900 border border-white flex items-center justify-center shadow-sm z-10">
-                                                        <span className="text-[7px] font-black text-white">{bill.owner.charAt(0)}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <h4 className="font-bold text-sm text-slate-900 truncate leading-tight">{bill.name}</h4>
-                                                    {(bill.status === 'overdue' || bill.status === 'due_today') && (
-                                                        <span className="flex size-1.5 rounded-full bg-red-600 animate-pulse shrink-0 shadow-[0_0_5px_red]"></span>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-1.5 text-[10px] font-medium opacity-80 truncate leading-tight mt-0.5 text-slate-600">
-                                                        <span>{bill.category}</span>
-                                                        <span className="opacity-50">•</span>
-                                                        <span>{getStatusLabel(bill)}</span>
-                                                    </div>
-                                                    {(bill.status === 'overdue' || bill.status === 'due_soon' || bill.status === 'due_today') && (
-                                                        <div className="origin-left scale-90 -ml-0.5 mt-0.5">
-                                                            <CountdownTimer targetDate={new Date(bill.dueDate)} status={bill.status} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Actions */}
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setDiscussingBillId(bill.id); }}
-                                                        className="neo-btn rounded-full size-7 flex items-center justify-center text-slate-500 hover:text-primary transition-colors active:scale-95"
-                                                    >
-                                                        <span className="material-symbols-outlined text-sm">chat_bubble_outline</span>
-                                                    </button>
-                                                </div>
-
-                                                <div className="text-right px-1">
-                                                    <p className="font-bold text-sm text-slate-900 tabular-nums drop-shadow-sm">
-                                                        ${bill.amount.toFixed(0)}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => handlePayClick(e, bill)}
-                                                    className={clsx(
-                                                        "h-8 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wide shadow-sm transition-all active:scale-95 flex items-center justify-center border",
-                                                        bill.status === 'overdue'
-                                                            ? "bg-red-600 text-white border-red-500 hover:bg-red-700 shadow-[0_2px_5px_rgba(220,38,38,0.4)]"
-                                                            : "neo-btn-primary"
-                                                    )}
-                                                >
-                                                    Pay
-                                                </button>
-                                            </div>
-                                        </div>
+                                            onPayClick={(e) => handlePayClick(e, bill)}
+                                        />
                                     ))
                                 )}
                             </div>
