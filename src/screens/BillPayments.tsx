@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import CommentModal, { Comment } from '../components/CommentModal';
 import { useBills, Bill as FirestoreBill } from '@/hooks/useBills';
 import { useAuth } from '@/context/AuthContext';
+import { format, parseISO } from 'date-fns';
 
 // Use Firestore Bill type directly
 type Bill = FirestoreBill;
@@ -372,7 +373,7 @@ export default function BillPayments() {
                         ${bill.amount.toFixed(0)} Due
                       </p>
                       <span className="text-slate-200 text-[9px]">•</span>
-                      <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest truncate leading-none max-w-[80px]">{bill.companyName || bill.dueDate}</p>
+                      <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest truncate leading-none max-w-[80px]">{bill.companyName || format(parseISO(bill.dueDateIso), 'MMM d')}</p>
                     </div>
                   </div>
 

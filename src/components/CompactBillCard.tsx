@@ -8,6 +8,8 @@ interface CompactBillCardProps {
     bill: any; // Using any to handle both Firestore Bill and UIBill from Planning.tsx
     onClick?: () => void;
     onPayClick?: (e: React.MouseEvent) => void;
+    onCommentClick?: (e: React.MouseEvent) => void;
+    commentCount?: number;
 }
 
 /**
@@ -15,7 +17,7 @@ interface CompactBillCardProps {
  * Inspired by professional financial management apps.
  * Provides a high-density, status-aware view of a bill.
  */
-export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick, onPayClick }) => {
+export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick, onPayClick, onCommentClick, commentCount = 0 }) => {
     const dueDate = bill.dueDate instanceof Date ? bill.dueDate : parseISO(bill.dueDateIso || bill.dueDate);
     const today = new Date();
     const daysRemaining = differenceInCalendarDays(dueDate, today);
@@ -55,7 +57,7 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
         <div
             onClick={onClick}
             className={clsx(
-                "relative group flex items-center gap-2 p-2 pl-3 rounded-xl transition-all duration-200 cursor-pointer",
+                "relative group flex items-center gap-2 p-1.5 pl-2.5 rounded-xl transition-all duration-200 cursor-pointer",
                 "bg-white border hover:shadow-md active:scale-[0.99]",
                 statusConfig.border,
                 onClick && "hover:border-primary/30"
@@ -103,6 +105,21 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
                     </div>
                 </div>
             </div>
+
+            {/* Comment Button */}
+            {onCommentClick && (
+                <button
+                    onClick={onCommentClick}
+                    className="relative ml-1 h-7 w-7 rounded-md neo-btn flex items-center justify-center transition-all active:scale-90 shadow-sm border border-slate-200 hover:border-primary/30"
+                >
+                    <span className="material-symbols-outlined text-sm text-slate-600">comment</span>
+                    {commentCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] font-black rounded-full h-3.5 w-3.5 flex items-center justify-center shadow-sm">
+                            {commentCount}
+                        </span>
+                    )}
+                </button>
+            )}
 
             {/* Quick Action Button */}
             {onPayClick && bill.status !== 'paid' && (

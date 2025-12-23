@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-
+import { useGroup } from './useGroup';
 import { RecurrenceRule } from './useBills';
 
 export interface IncomeSource {
@@ -15,43 +15,17 @@ export interface IncomeSource {
     icon: string;
     logoUrl?: string; // Custom logo URL (overrides auto-detection)
     ownerId?: string;
+    groupId?: string; // Added groupId
 }
 
 export function useIncomeSources() {
+    const { group, canEditBills } = useGroup();
     const [sources, setSources] = useState<IncomeSource[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
 
-    // Migration Effect: Check for local data and move to Firestore
-    useEffect(() => {
-        if (!user || (user as any).isDemo) return;
-
-        const migrateData = async () => {
-            const localData = localStorage.getItem('pchk_income_sources');
-            if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        console.log("Migrating local income sources to Firestore...");
-                        for (const item of parsed) {
-                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                            const { id, ...data } = item; // Remove numeric ID
-                            await addDoc(collection(db, 'income_sources'), {
-                                ...data,
-                                ownerId: user.uid
-                            });
-                        }
-                        localStorage.removeItem('pchk_income_sources');
-                        console.log("Migration complete.");
-                    }
-                } catch (e) {
-                    console.error("Migration failed", e);
-                }
-            }
-        };
-
-        migrateData();
-    }, [user]);
+    const isDemo = user?.email === 'demo@pck2pck.app';
+    const groupId = group?.id;
 
     // Firestore Sync
     useEffect(() => {
@@ -61,7 +35,7 @@ export function useIncomeSources() {
             return;
         }
 
-        if ((user as any).isDemo) {
+        if (isDemo || !groupId) {
             const localData = localStorage.getItem('pchk_income_sources');
             if (localData) {
                 try {
@@ -77,7 +51,7 @@ export function useIncomeSources() {
             return;
         }
 
-        const q = query(collection(db, 'income_sources'), where('ownerId', '==', user.uid));
+        const q = query(collection(db, 'income_sources'), where('groupId', '==', groupId));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedSources: IncomeSource[] = snapshot.docs.map(doc => ({
@@ -90,12 +64,16 @@ export function useIncomeSources() {
         });
 
         return () => unsubscribe();
-    }, [user]);
+    }, [user, isDemo, groupId]);
 
     const addSource = async (source: Omit<IncomeSource, 'id'>) => {
         if (!user) return;
 
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied: You cannot add income sources.");
+        }
+
+        if (isDemo || !groupId) {
             const newSource = { ...source, id: Date.now().toString() };
             const newSources = [...sources, newSource];
             setSources(newSources);
@@ -105,14 +83,19 @@ export function useIncomeSources() {
 
         await addDoc(collection(db, 'income_sources'), {
             ...source,
-            ownerId: user.uid
+            groupId: groupId,
+            ownerId: user.uid // Keep track of creator
         });
     };
 
     const updateSource = async (id: string, updates: Partial<IncomeSource>) => {
         if (!user) return;
 
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied: You cannot edit income sources.");
+        }
+
+        if (isDemo || !groupId) {
             const newSources = sources.map(s => s.id === id ? { ...s, ...updates } : s);
             setSources(newSources);
             localStorage.setItem('pchk_income_sources', JSON.stringify(newSources));
@@ -125,7 +108,11 @@ export function useIncomeSources() {
     const deleteSource = async (id: string) => {
         if (!user) return;
 
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied: You cannot delete income sources.");
+        }
+
+        if (isDemo || !groupId) {
             const newSources = sources.filter(s => s.id !== id);
             setSources(newSources);
             localStorage.setItem('pchk_income_sources', JSON.stringify(newSources));

@@ -59,3 +59,20 @@ Before taking any action (either tool calls
 
 
 9) Inhibit your response: only take an action after all the above reasoning is completed. Once you've taken an action, you cannot take it back.
+
+# Multiplayer Logic & Constraints
+
+1.  **Group-Centric Data Model**:
+    *   All shared data (bills, income, comments) MUST belong to a `Group`, not an individual `User`.
+    *   Users MUST be associated with a `groupId`.
+    *   Data access is determined by membership in a `Group`.
+
+2.  **Permissions & Roles**:
+    *   **Admins**: "Full Unconstrained Access". Can manage members (add/remove/edit), manage group settings, and have full CRUD access to all data (Bills, Income, etc.).
+    *   **Members**: "Daily User Access". Can view all data and mark bills as paid. CANNOT create/edit/delete bills or manage the group/members.
+    *   At least one Admin must exist per group.
+
+3.  **Invitation Flow**:
+    *   Invites are generated as unique links or codes.
+    *   "Text Only Login" (likely Phone Auth) must be supported for users joining via SMS invites.
+    *   New users joining via invite are automatically added to the specific group.

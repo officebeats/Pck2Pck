@@ -11,6 +11,8 @@ import { getNextOccurrences } from '@/lib/recurrence';
 import { useToast, getErrorMessage } from '@/components/Toast';
 import CompanyLogo from '@/components/CompanyLogo';
 import CompactBillCard from '@/components/CompactBillCard';
+import { format } from 'date-fns';
+import { useGroup } from '@/hooks/useGroup';
 
 // --- Interfaces ---
 
@@ -80,6 +82,7 @@ export default function Home() {
     const { showError, showSuccess } = useToast();
     const { bills, loading, markAsPaid, updateBill } = useBills();
     const { sources } = useIncomeSources();
+    const { canEditBills, isAdmin } = useGroup();
 
     // --- Constants ---
     const today = new Date();
@@ -88,119 +91,65 @@ export default function Home() {
 
     // --- State ---
     const [currentBalance, setCurrentBalance] = useState(2450.00);
-
-    // Bills come from the hook now, no need for local state
-
-
-    // Modal State
-    const [confirmingBillId, setConfirmingBillId] = useState<string | null>(null);
     const [viewingDetailsBillId, setViewingDetailsBillId] = useState<string | null>(null);
-    const [discussingBillId, setDiscussingBillId] = useState<string | null>(null);
-    const [showPaydayModal, setShowPaydayModal] = useState(false);
-
-    // Interaction State
+    const [confirmingBillId, setConfirmingBillId] = useState<string | null>(null);
     const [actualPayAmount, setActualPayAmount] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [showPaydayModal, setShowPaydayModal] = useState(false);
     const [paydayConfirmationText, setPaydayConfirmationText] = useState('');
+    const [discussingBillId, setDiscussingBillId] = useState<string | null>(null);
 
     // --- Derived State (Logic) ---
 
     const unpaidBills = useMemo(() => bills.filter(b => b.status !== 'paid'), [bills]);
 
-    /**
-     * Sorts bills by urgency score:
-     * 0: Overdue (Highest)
-     * 1: Due Today
-     * 2: Upcoming
-     */
-    const sortedBills = useMemo(() => {
-        return [...unpaidBills].sort((a, b) => {
-            const getScore = (bill: Bill) => {
-                if (bill.status === 'overdue') return 0;
-                if (bill.status === 'due_today') return 1;
-                return 2;
-            };
-
-            const scoreA = getScore(a);
-            const scoreB = getScore(b);
-
-            if (scoreA !== scoreB) return scoreA - scoreB;
-
-            // Secondary sort: Paycheck Cycle
-            if (a.paycheckLabel !== b.paycheckLabel) return a.paycheckLabel === 'Oct #2' ? -1 : 1;
-
-            // Tertiary sort: Due Date
-            const timeA = new Date(a.dueDate).getTime();
-            const timeB = new Date(b.dueDate).getTime();
-            if (timeA !== timeB) return timeA - timeB;
-
-            // Quaternary sort: Amount (High to Low)
-            return b.amount - a.amount;
-        });
-    }, [unpaidBills]);
-
-    // Group bills by paycheck label for easier rendering
-    const billsByPaycheck = useMemo(() => {
-        const groups: { label: string; bills: Bill[] }[] = [];
-        sortedBills.forEach((bill) => {
-            let group = groups.find((g) => g.label === bill.paycheckLabel);
-            if (!group) {
-                group = { label: bill.paycheckLabel, bills: [] };
-                groups.push(group);
-            }
-            group.bills.push(bill);
-        });
-        return groups;
-    }, [sortedBills]);
-
-    const totalUnpaid = unpaidBills.reduce((acc, bill) => acc + bill.amount, 0);
-
-    // Project income occurrences for the current month
-    const monthlyIncomeOccurrences = useMemo(() => {
-        const occurrences: { date: Date; amount: number; name: string }[] = [];
-        sources.forEach(source => {
-            const start = new Date(source.nextPayday);
-            const occs = getNextOccurrences(source.recurrence, start, 10, endOfMonth);
-            occs.forEach(date => {
-                if (date >= startOfMonth && date <= endOfMonth) {
-                    occurrences.push({ date, amount: source.amount, name: source.name });
-                }
-            });
-        });
-        return occurrences.sort((a, b) => a.date.getTime() - b.date.getTime());
-    }, [sources, startOfMonth, endOfMonth]);
-
-    const projectedIncome = useMemo(() => {
-        return monthlyIncomeOccurrences.reduce((total, occ) => total + occ.amount, 0);
-    }, [monthlyIncomeOccurrences]);
-
-    const nextPaydayEvent = useMemo(() => {
-        return monthlyIncomeOccurrences.find(occ => occ.date >= today);
-    }, [monthlyIncomeOccurrences, today]);
-
-    const daysUntilPayday = useMemo(() => {
-        if (!nextPaydayEvent) return null;
-        const diffTime = nextPaydayEvent.date.getTime() - today.getTime();
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }, [nextPaydayEvent, today]);
-
-    // Update currentCycleBills to include all bills due this month + overdue
     const currentCycleBills = useMemo(() => {
-        return bills.filter(b => {
-            const dueDate = new Date(b.dueDate);
-            return (dueDate >= startOfMonth && dueDate <= endOfMonth) || b.status === 'overdue';
+        return bills.filter(bill => {
+            const dueDate = new Date(bill.dueDate);
+            return dueDate >= startOfMonth && dueDate <= endOfMonth;
         });
     }, [bills, startOfMonth, endOfMonth]);
+
+    const sortedBills = useMemo(() => {
+        return [...currentCycleBills].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    }, [currentCycleBills]);
+
+    const projectedIncome = useMemo(() => {
+        return sources.reduce((acc, source) => acc + source.amount, 0);
+    }, [sources]);
 
     const totalCycleAmount = useMemo(() => {
         return currentCycleBills.reduce((acc, b) => acc + b.amount, 0);
     }, [currentCycleBills]);
+
     const paidCycleAmount = currentCycleBills.filter(b => b.status === 'paid').reduce((acc, b) => acc + b.amount, 0);
     const percentPaid = totalCycleAmount > 0 ? (paidCycleAmount / totalCycleAmount) * 100 : 0;
     const remainingBillCount = currentCycleBills.filter(b => b.status !== 'paid').length;
 
     const safeToSpend = projectedIncome - totalCycleAmount;
     const isPositive = safeToSpend >= 0;
+
+    // Fix for masked variables
+    const safeSpendMonthly = safeToSpend;
+    const daysRemainingInMonth = endOfMonth.getDate() - today.getDate() + 1;
+    const safeSpendDaily = safeSpendMonthly > 0 ? safeSpendMonthly / Math.max(1, daysRemainingInMonth) : 0;
+
+    const daysUntilPayday = useMemo(() => {
+        if (sources.length === 0) return null;
+
+        // Find the earliest next payday
+        const dates = sources.map(s => new Date(s.nextPayday).getTime());
+        const minDate = Math.min(...dates);
+
+        // Calculate difference
+        const diffTime = Math.abs(minDate - today.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        // Note: Logic might need refinement for "today" vs "future", but basic diff is fine for now.
+        // Better:
+        const nextPayday = new Date(minDate);
+        const difference = Math.ceil((nextPayday.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        return difference > 0 ? difference : 0;
+    }, [sources]);
 
     const billToPay = bills.find(b => b.id === confirmingBillId);
     const detailsBill = bills.find(b => b.id === viewingDetailsBillId);
@@ -342,55 +291,80 @@ export default function Home() {
                 {/* Main Dashboard Content - Only show when setup is complete */}
                 {sources.length > 0 && (
                     <>
-                        {/* Compact Progress Card */}
-                        {/* Coinbase-Style Hero Card */}
-                        <div className="neo-card p-3 relative overflow-hidden group bg-white shadow-lg border-none ring-1 ring-slate-100">
-                            <div className="flex flex-col items-center justify-center text-center gap-0.5 mb-3 z-10 relative">
+                        {/* Safe To Spend Hero Card */}
+                        <div className="neo-card p-4 relative overflow-hidden group bg-white shadow-lg border-none ring-1 ring-slate-100">
+                            <div className="flex flex-col items-center justify-center text-center gap-1 mb-4 z-10 relative">
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
                                     <span className="material-symbols-outlined text-xs">account_balance_wallet</span>
                                     Left to Spend
                                 </p>
                                 <div className={clsx("text-4xl font-black leading-none tracking-tighter transition-colors", isPositive ? "text-slate-900" : "text-red-500")}>
-                                    {safeToSpend < 0 ? '-' : ''}${Math.abs(safeToSpend).toLocaleString()}
+                                    {isAdmin ? (
+                                        <>
+                                            {safeToSpend < 0 ? '-' : ''}${Math.abs(safeToSpend).toLocaleString()}
+                                        </>
+                                    ) : (
+                                        <span className="text-slate-300">$---</span>
+                                    )}
                                 </div>
                                 <p className={clsx("text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full mt-1", isPositive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")}>
                                     {isPositive ? 'On Track' : 'Over Budget'}
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-1 border-t border-slate-50 pt-3">
+                            <div className="grid grid-cols-2 gap-2 border-t border-slate-50 pt-3">
                                 <div
                                     onClick={() => navigate('/planning?view=income')}
-                                    className="flex flex-col items-center gap-0 p-1.5 rounded-xl cursor-pointer hover:bg-emerald-50/50 active:scale-95 transition-all"
+                                    className="flex flex-col items-center gap-0.5 p-2 rounded-xl cursor-pointer hover:bg-emerald-50/50 active:scale-95 transition-all"
                                 >
                                     <div className="flex items-center gap-1 text-emerald-600">
                                         <span className="material-symbols-outlined text-xs">trending_up</span>
                                         <span className="text-[9px] font-black uppercase tracking-widest">Income</span>
                                     </div>
-                                    <span className="text-sm font-black text-emerald-600 tracking-tight">+${projectedIncome.toLocaleString()}</span>
+                                    <span className="text-sm font-black text-emerald-600 tracking-tight">
+                                        {isAdmin ? `+$${projectedIncome.toLocaleString()}` : '+$---'}
+                                    </span>
                                 </div>
                                 <div
-                                    onClick={() => navigate('/planning?view=bills')}
-                                    className="flex flex-col items-center gap-0 p-1.5 rounded-xl cursor-pointer hover:bg-red-50/50 active:scale-95 transition-all relative after:absolute after:left-0 after:top-1.5 after:bottom-1.5 after:w-px after:bg-slate-50"
+                                    className="flex flex-col items-center gap-0.5 p-2 rounded-xl"
                                 >
                                     <div className="flex items-center gap-1 text-red-500">
-                                        <span className="material-symbols-outlined text-xs">trending_down</span>
+                                        <span className="material-symbols-outlined text-xs"> trending_down </span>
                                         <span className="text-[9px] font-black uppercase tracking-widest">Bills</span>
                                     </div>
-                                    <span className="text-sm font-black text-slate-900 tracking-tight">-${totalCycleAmount.toLocaleString()}</span>
+                                    <span className="text-sm font-black text-red-500 tracking-tight">-${totalCycleAmount.toLocaleString()}</span>
                                 </div>
-                            </div>
-
-                            {/* Subtle Progress Indicator */}
-                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-50">
-                                <div
-                                    className={clsx("h-full transition-all duration-1000", isPositive ? "bg-emerald-500" : "bg-red-500")}
-                                    style={{ width: `${Math.min(percentPaid, 100)}%` }}
-                                ></div>
                             </div>
                         </div>
 
+                        {/* Cycle Control Row */}
+                        <div className="flex items-center gap-2">
+                            <div className="neo-card flex-1 px-3 py-2 flex items-center justify-between bg-white shadow-sm border-none ring-1 ring-slate-100">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-slate-400 text-lg">calendar_today</span>
+                                    <div className="flex flex-col">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Current Cycle</p>
+                                        <p className="text-xs font-black text-slate-900">{today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {canEditBills && (
+                                <button
+                                    onClick={() => navigate('/planning')}
+                                    className="neo-btn-primary h-full aspect-square flex items-center justify-center rounded-xl shadow-sm active:scale-95 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-xl">add</span>
+                                </button>
+                            )}
+                        </div>
 
+                        {/* Progress Bar */}
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden w-full">
+                            <div
+                                className={clsx("h-full transition-all duration-1000", isPositive ? "bg-emerald-500" : "bg-red-500")}
+                                style={{ width: `${Math.min(percentPaid, 100)}%` }}
+                            ></div>
+                        </div>
 
                         {/* --- Priority To-Pay --- */}
                         <div className="flex flex-col gap-2">
@@ -422,7 +396,8 @@ export default function Home() {
                             </div>
                         </div>
                     </>
-                )}
+                )
+                }
 
             </main >
 

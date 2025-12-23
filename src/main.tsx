@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
+import './utils/testDataGenerator'; // Make test data generator available in console
 
 // Register service worker
 const updateSW = registerSW({

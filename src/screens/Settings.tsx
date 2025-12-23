@@ -2,29 +2,42 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { useAuth } from '@/context/AuthContext';
-import { useHousehold, HouseholdMember } from '@/hooks/useHousehold';
+import { useGroup, GroupMember } from '@/hooks/useGroup';
 import { useToast } from '@/components/Toast';
 import { updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
+
 export default function Settings() {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { showError, showSuccess } = useToast();
-    const { members, isAdmin, removeMember, sendInvite, updateHouseholdName, household } = useHousehold();
+    const {
+        group,
+        membersList: members,
+        isAdmin,
+        canManageGroup,
+        removeMember,
+        createGroup,
+        joinGroup,
+        generateInviteCode
+    } = useGroup();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Local state for edits
     const [name, setName] = useState('User');
     const [email, setEmail] = useState('');
     const [avatar, setAvatar] = useState('https://cdn-icons-png.flaticon.com/512/149/149071.png');
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [isUploading, setIsUploading] = useState(false);
 
-    // Invite state
+    // Group UI State
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [inviteData, setInviteData] = useState({ name: '', contact: '' });
-    const [isInviting, setIsInviting] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [inviteCodeInput, setInviteCodeInput] = useState('');
+    const [generatedInviteCode, setGeneratedInviteCode] = useState('');
+
+    // Loading states
+    const [isUploading, setIsUploading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -44,7 +57,8 @@ export default function Settings() {
             const keysToRemove = [
                 'pchk_dashboard_bills', 'pchk_planning_bills',
                 'pchk_recurring_bills', 'pchk_income_sources',
-                'pchk_chats', 'pchk_bill_payments'
+                'pchk_chats', 'pchk_bill_payments',
+                'pchk_bills', 'pchk_income_sources'
             ];
             keysToRemove.forEach(key => localStorage.removeItem(key));
             await logout();
@@ -87,28 +101,53 @@ export default function Settings() {
         }
     };
 
-    const handleSendInvite = async () => {
-        if (!inviteData.contact) return;
-
-        setIsInviting(true);
+    const handleCreateGroup = async () => {
+        if (!newGroupName.trim()) return;
+        setIsProcessing(true);
         try {
-            const isEmail = inviteData.contact.includes('@');
-            await sendInvite({
-                name: inviteData.name,
-                [isEmail ? 'email' : 'phone']: inviteData.contact
-            });
-            showSuccess('Invite Sent', `An invitation has been sent to ${inviteData.name || inviteData.contact}.`);
-            setShowInviteModal(false);
-            setInviteData({ name: '', contact: '' });
+            await createGroup(newGroupName);
+            showSuccess('Group Created', `"${newGroupName}" established.`);
+            setNewGroupName('');
         } catch (error) {
-            showError('Invite Failed', 'Could not send invitation. Please try again.');
+            showError('Error', 'Failed to create group');
         } finally {
-            setIsInviting(false);
+            setIsProcessing(false);
         }
     };
 
-    const handleRemoveMember = async (member: HouseholdMember) => {
-        if (window.confirm(`Are you sure you want to remove ${member.name} from your household?`)) {
+    const handleJoinGroup = async () => {
+        if (!inviteCodeInput.trim()) return;
+        setIsProcessing(true);
+        try {
+            await joinGroup(inviteCodeInput.toUpperCase());
+            showSuccess('Joined Group', 'Welcome to the team.');
+            setInviteCodeInput('');
+        } catch (error) {
+            showError('Invalid Code', 'Could not find group with that code.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleGenerateInvite = async () => {
+        try {
+            const code = await generateInviteCode();
+            setGeneratedInviteCode(code);
+            // Native Share
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Join my Pck2Pck Group',
+                    text: `Join my finance group on Pck2Pck with code: ${code}`,
+                    url: window.location.origin
+                }).catch(console.error);
+            }
+        } catch (error) {
+            showError('Error', 'Could not generate invite code');
+        }
+    };
+
+    const handleRemoveMember = async (member: GroupMember) => {
+        if (window.confirm(`Remove ${member.name}? They will lose access to this group.`)) {
             try {
                 await removeMember(member.id);
                 showSuccess('Member Removed', `${member.name} has been removed.`);
@@ -125,7 +164,7 @@ export default function Settings() {
                 <button onClick={() => navigate(-1)} className="neo-btn flex size-9 shrink-0 items-center justify-center text-slate-800 rounded-full md:hidden active:scale-95 transition-all">
                     <span className="material-symbols-outlined text-xl">arrow_back_ios_new</span>
                 </button>
-                <h1 className="text-slate-900 text-lg font-black leading-tight tracking-tight flex-1 text-center md:text-left">Control Panel</h1>
+                <h1 className="text-slate-900 text-lg font-black leading-tight tracking-tight flex-1 text-center md:text-left">Settings</h1>
                 <div className="size-9 md:hidden"></div>
             </div>
 
@@ -175,116 +214,128 @@ export default function Settings() {
                                         className="neo-inset w-full p-2.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Coordinates</label>
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="neo-inset w-full p-2.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none"
-                                    />
-                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                {/* Household Section */}
+                {/* Group Management Section */}
                 <section className="animate-fade-in delay-100">
                     <div className="flex items-center justify-between mb-2 px-1">
-                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Household Management</h2>
-                        {isAdmin && (
-                            <button
-                                onClick={() => setShowInviteModal(true)}
-                                className="text-[9px] font-black text-primary uppercase tracking-widest hover:underline"
-                            >
-                                Invite User
-                            </button>
-                        )}
+                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Group Settings</h2>
                     </div>
 
-                    <div className="neo-card divide-y divide-slate-100">
-                        {members.map(member => (
-                            <div key={member.id} className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="neo-card p-0.5 rounded-full shrink-0">
-                                        <img
-                                            src={member.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png'}
-                                            alt={member.name}
-                                            className="size-10 rounded-full object-cover border border-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{member.name}</p>
-                                            <span className={clsx(
-                                                "text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest",
-                                                member.role === 'admin' ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
-                                            )}>
-                                                {member.role}
-                                            </span>
-                                        </div>
-                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{member.status}</p>
-                                    </div>
-                                </div>
-                                {isAdmin && member.role !== 'admin' && (
+                    {!group ? (
+                        <div className="neo-card p-6 space-y-6">
+                            {/* Create Group */}
+                            <div>
+                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide mb-3">Create New Group</h3>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Group Name"
+                                        value={newGroupName}
+                                        onChange={(e) => setNewGroupName(e.target.value)}
+                                        className="neo-inset flex-1 p-3 rounded-xl text-sm font-bold focus:outline-none"
+                                    />
                                     <button
-                                        onClick={() => handleRemoveMember(member)}
-                                        className="size-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                        onClick={handleCreateGroup}
+                                        disabled={!newGroupName.trim() || isProcessing}
+                                        className="neo-btn-primary px-4 rounded-xl font-black text-xs uppercase tracking-wider"
                                     >
-                                        <span className="material-symbols-outlined text-lg">person_remove</span>
+                                        Create
                                     </button>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-slate-100 w-full"></div>
+
+                            {/* Join Group */}
+                            <div>
+                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wide mb-3">Join Existing Group</h3>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter Invite Code"
+                                        value={inviteCodeInput}
+                                        onChange={(e) => setInviteCodeInput(e.target.value)}
+                                        className="neo-inset flex-1 p-3 rounded-xl text-sm font-bold focus:outline-none uppercase tracking-widest"
+                                        maxLength={6}
+                                    />
+                                    <button
+                                        onClick={handleJoinGroup}
+                                        disabled={!inviteCodeInput.trim() || isProcessing}
+                                        className="neo-btn px-4 rounded-xl font-black text-xs uppercase tracking-wider text-primary"
+                                    >
+                                        Join
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="neo-card divide-y divide-slate-100">
+                            {/* Group Info Header */}
+                            <div className="p-4 bg-slate-50/50">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active Group</p>
+                                        <h3 className="text-lg font-black text-slate-900">{group.name}</h3>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={handleGenerateInvite}
+                                            className="neo-btn px-3 py-2 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-primary"
+                                        >
+                                            <span className="material-symbols-outlined text-base">person_add</span>
+                                            Invite
+                                        </button>
+                                    )}
+                                </div>
+                                {generatedInviteCode && (
+                                    <div className="mt-3 p-3 bg-primary/10 rounded-xl flex items-center justify-between border border-primary/20">
+                                        <span className="text-xs font-bold text-primary">Code: <span className="font-black text-lg ml-2 tracking-[0.2em]">{generatedInviteCode}</span></span>
+                                        <span className="text-[9px] font-bold text-primary/60 uppercase">Share this code</span>
+                                    </div>
                                 )}
                             </div>
-                        ))}
-                    </div>
-                </section>
 
-                {/* App Preferences */}
-                <section className="animate-fade-in delay-150">
-                    <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">System</h2>
-                    <div className="neo-card overflow-hidden divide-y divide-slate-100">
-
-                        <div className="flex items-center justify-between p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="neo-inset size-9 rounded-xl flex items-center justify-center text-primary bg-primary/5">
-                                    <span className="material-symbols-outlined text-lg">notifications</span>
-                                </div>
-                                <span className="text-xs font-black text-slate-900 uppercase tracking-wide">Bill Reminders</span>
-                            </div>
-                            <button
-                                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                                className={clsx("w-10 h-5 rounded-full relative transition-all duration-300 shadow-inner", notificationsEnabled ? "bg-primary" : "bg-slate-200")}
-                            >
-                                <div className={clsx("absolute top-1 left-1 bg-white size-3 rounded-full shadow-md transition-transform duration-300", notificationsEnabled ? "translate-x-5" : "")}></div>
-                            </button>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Security */}
-                <section className="animate-fade-in delay-100">
-                    <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Security</h2>
-                    <div className="neo-card p-4 space-y-4">
-                        <p className="text-xs text-slate-500">Security managed via Google Auth / Firebase.</p>
-                    </div>
-                </section>
-
-                {/* Data & Storage */}
-                <section className="animate-fade-in delay-150">
-                    <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Data Retention</h2>
-                    <div className="neo-card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="neo-inset size-9 rounded-xl flex items-center justify-center text-slate-600 bg-slate-50">
-                                    <span className="material-symbols-outlined text-lg">sd_storage</span>
-                                </div>
-                                <div>
-                                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight">Local Storage</p>
-                                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider mt-0.5">Status: Operational</p>
-                                </div>
+                            <div className="space-y-2 p-4">
+                                {members.map(member => (
+                                    <div key={member.id} className="neo-card p-2 flex items-center gap-3">
+                                        <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs uppercase overflow-hidden">
+                                            {member.photoURL ? (
+                                                <img src={member.photoURL} alt={member.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                member.name.substring(0, 2)
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-xs font-black text-slate-900 truncate">{member.name}</p>
+                                                {member.id === group?.members[user?.uid || '']?.id && (
+                                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[8px] font-bold uppercase rounded tracking-wider">You</span>
+                                                )}
+                                            </div>
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{member.role}</p>
+                                        </div>
+                                        {canManageGroup && member.id !== user?.uid && (
+                                            <button
+                                                onClick={() => handleRemoveMember(member.id)}
+                                                className="size-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-base">delete</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
+                    )}
+                </section>
+
+                {/* Account Actions */}
+                <section className="animate-fade-in delay-300 pt-2 pb-8">
+                    <div className="neo-card p-4 space-y-4 mb-6">
                         <button
                             onClick={handleResetData}
                             className="w-full py-3 rounded-xl border-2 border-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -293,79 +344,16 @@ export default function Settings() {
                             Clear Local Cache
                         </button>
                     </div>
-                </section>
 
-                {/* Account Actions */}
-                <section className="animate-fade-in delay-300 pt-2 pb-8">
                     <button onClick={handleSignOut} className="w-full py-4 text-slate-400 font-black text-xs uppercase tracking-[0.2em] neo-btn rounded-xl hover:text-red-500 active:scale-95 transition-all">
                         Terminate Session
                     </button>
                     <div className="text-center mt-6">
-                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-widest opacity-60">PCK2PCK v1.2.0 • Build 2405</p>
+                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-widest opacity-60">PCK2PCK v1.2.0 • Build Multi-01</p>
                     </div>
                 </section>
 
             </main>
-
-            {/* Invite Modal */}
-            {showInviteModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="neo-card w-full max-w-sm p-6 transform transition-all animate-scale-up">
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h2 className="text-lg font-bold text-slate-900">Invite Member</h2>
-                                <p className="text-xs text-slate-500">Expand your household collective.</p>
-                            </div>
-                            <button onClick={() => setShowInviteModal(false)} className="neo-btn rounded-full p-2 text-gray-500">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Full Name</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Steph Currie"
-                                    value={inviteData.name}
-                                    onChange={(e) => setInviteData({ ...inviteData, name: e.target.value })}
-                                    className="neo-inset w-full p-3.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email or Phone</label>
-                                <input
-                                    type="text"
-                                    placeholder="steph@example.com or 555-0000"
-                                    value={inviteData.contact}
-                                    onChange={(e) => setInviteData({ ...inviteData, contact: e.target.value })}
-                                    className="neo-inset w-full p-3.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-8">
-                            <button
-                                onClick={handleSendInvite}
-                                disabled={!inviteData.contact || isInviting}
-                                className={clsx(
-                                    "w-full p-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2",
-                                    inviteData.contact && !isInviting
-                                        ? "neo-btn-primary text-white active:scale-95"
-                                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                )}
-                            >
-                                {isInviting ? (
-                                    <div className="size-4 border-2 border-white/30 border-t-white animate-spin rounded-full"></div>
-                                ) : (
-                                    <span className="material-symbols-outlined text-base">send</span>
-                                )}
-                                <span>Dispatch Invite</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

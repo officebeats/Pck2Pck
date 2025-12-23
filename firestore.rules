@@ -1,19 +1,65 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Bills collection - users can only read/write their own bills
+    // Helper function to check if user is a member of the group
+    function isMember(groupId) {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/groups/$(groupId)) &&
+             request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+    }
+
+    // Helper function to check if user is an ADMIN of the group
+    function isAdmin(groupId) {
+      return isMember(groupId) && 
+             get(/databases/$(database)/documents/groups/$(groupId)).data.members[request.auth.uid].role == 'admin';
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      // Allow reading if you are a member
+      allow read: if request.auth != null && (
+        resource == null || // Allow reading if it doesn't exist (needed for creation checks sometimes)
+        request.auth.uid in resource.data.memberIds
+      );
+      
+      // Allow creating if authenticated
+      allow create: if request.auth != null;
+      
+      // Update rules:
+      // Admins can update everything independently
+      allow update: if request.auth != null && (
+        resource.data.members[request.auth.uid].role == 'admin' ||
+        // Allow users to update ONLY their own joinedAt/status if needed (e.g. accepting invite) - simplified for now to Admin only for settings
+        // Self-join logic might be needed here later, but for now assuming cloud function or existing admin adds them
+        false
+      );
+    }
+
+    // Bills collection - scoped to groups
     match /bills/{billId} {
-      allow read, write: if request.auth != null && 
-                           (resource == null || resource.data.ownerId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
+      allow read: if isMember(resource.data.groupId);
+      
+      // Create: user must be an admin of the target group
+      allow create: if isAdmin(request.resource.data.groupId);
+      
+      // Update: members can only update 'paid status', admins can update everything
+      allow update: if isMember(resource.data.groupId) && (
+        isAdmin(resource.data.groupId) || 
+        // Member can ONLY update 'status', 'paidDate', 'lastPaid' fields
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paidDate', 'lastPaid', 'history']))
+      );
+      
+      // Delete: Admins only
+      allow delete: if isAdmin(resource.data.groupId);
     }
     
-    // Income sources collection - users can only read/write their own income
+    // Income sources collection - scoped to groups
     match /income_sources/{incomeId} {
-      allow read, write: if request.auth != null && 
-                           (resource == null || resource.data.ownerId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
+      allow read: if isMember(resource.data.groupId);
+      allow write: if isAdmin(request.resource.data.groupId) || isAdmin(resource.data.groupId);
     }
     
-    // Users collection - users can only read/write their own data
+    // Users collection - keep for user preferences if needed
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }

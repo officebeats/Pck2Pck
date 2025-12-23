@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const loginWithDemo = async (email: string) => {
         const demoUser = {
-            uid: 'demo-user-123',
+            uid: 'demo-user',
             displayName: 'Demo User',
             email: email,
             photoURL: 'https://cdn-icons-png.flaticon.com/512/149/149071.png',

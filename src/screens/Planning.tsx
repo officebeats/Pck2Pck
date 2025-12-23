@@ -6,6 +6,7 @@ import RepeatPicker, { generateRecurrenceSummary } from '../components/RepeatPic
 import { useBills, Bill as FirestoreBill, RecurrenceRule } from '@/hooks/useBills';
 import { useIncomeSources, IncomeSource } from '@/hooks/useIncomeSources';
 import { useHousehold } from '@/hooks/useHousehold';
+import { useGroup } from '@/hooks/useGroup';
 import { getNextOccurrences } from '@/lib/recurrence';
 import Calendar from '../components/Calendar';
 import { isPast, isToday, isFuture, startOfDay, isSameDay } from 'date-fns';
@@ -127,9 +128,11 @@ const THEME_STYLES: Record<ColorTheme, {
 export default function Planning() {
     const navigate = useNavigate();
     const { showError, showSuccess } = useToast();
+    const { canEditBills, isAdmin } = useGroup();
 
     // --- Household/Group State ---
-    const { members, isSoloMode } = useHousehold();
+    const { membersList: members } = useGroup();
+    const isSoloMode = members.length <= 1;
 
     // --- Persistent State for Bills ---
     const { bills: firestoreBills, addBill, updateBill, deleteBill, addBillComment, batchUpdateBills, markAsPaid } = useBills();
@@ -194,6 +197,7 @@ export default function Planning() {
         icon: 'receipt',
         dueMonth: 0,
         website: '',
+        paymentUrl: '',
         notes: '',
         owner: 'Joint',
         isTentative: false,
@@ -375,6 +379,7 @@ export default function Planning() {
                 dueMonth: bill.dueMonth || bill.dueDate.getMonth(),
                 dueDayOfWeek: bill.dueDayOfWeek || 'Monday',
                 website: bill.website || '',
+                paymentUrl: bill.paymentUrl || '',
                 username: bill.username || '',
                 password: bill.password || '',
                 accountNumber: bill.accountNumber || '',
@@ -404,6 +409,7 @@ export default function Planning() {
                 dueMonth: 0,
                 dueDayOfWeek: 'Monday',
                 website: '',
+                paymentUrl: '',
                 username: '',
                 password: '',
                 accountNumber: '',
@@ -458,6 +464,7 @@ export default function Planning() {
             dueMonth: formData.dueMonth,
             dueDayOfWeek: formData.dueDayOfWeek,
             website: formData.website,
+            paymentUrl: formData.paymentUrl,
             username: formData.username,
             password: formData.password,
             accountNumber: formData.accountNumber,
@@ -632,19 +639,21 @@ export default function Planning() {
                         <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">Strategic Overview</h1>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        {viewMode === 'bills' && bills.length > 0 && (
+                        {canEditBills && viewMode === 'bills' && bills.length > 0 && (
                             <button onClick={autoAssignBills} className="neo-btn px-2.5 py-1.5 flex items-center gap-1 rounded-full text-slate-500 hover:text-primary active:scale-95 transition-all bg-white shadow-sm border-slate-100">
                                 <span className="material-symbols-outlined text-base">auto_fix_high</span>
                                 <span className="text-[9px] font-black uppercase tracking-wide hidden sm:inline">Auto</span>
                             </button>
                         )}
-                        <button
-                            onClick={() => viewMode === 'income' ? handleOpenIncomeModal() : handleOpenModal()}
-                            className="neo-btn-primary px-3 py-1.5 flex items-center gap-1.5 rounded-full shadow-lg active:scale-95 transition-all text-white"
-                        >
-                            <span className="material-symbols-outlined text-base font-black">add</span>
-                            <span className="text-[10px] font-black uppercase tracking-wide">{viewMode === 'income' ? 'Add Income' : 'Add Bill'}</span>
-                        </button>
+                        {((viewMode === 'income' && isAdmin) || (viewMode === 'bills' && canEditBills)) && (
+                            <button
+                                onClick={() => viewMode === 'income' ? handleOpenIncomeModal() : handleOpenModal()}
+                                className="neo-btn-primary px-3 py-1.5 flex items-center gap-1.5 rounded-full shadow-lg active:scale-95 transition-all text-white"
+                            >
+                                <span className="material-symbols-outlined text-base font-black">add</span>
+                                <span className="text-[10px] font-black uppercase tracking-wide">{viewMode === 'income' ? 'Add Income' : 'Add Bill'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -700,15 +709,22 @@ export default function Planning() {
                                 </div>
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-2">Let's Get Started</h3>
                                 <p className="text-xs text-slate-500 mb-6 max-w-[260px]">Add your recurring bills to see them on the calendar and track when they're due.</p>
-                                <button
-                                    onClick={() => handleOpenModal()}
-                                    className="neo-btn-primary px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg">add</span>
-                                        Add Your First Bill
-                                    </span>
-                                </button>
+                                {canEditBills && (
+                                    <button
+                                        onClick={() => handleOpenModal()}
+                                        className="neo-btn-primary px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-lg">add</span>
+                                            Add Your First Bill
+                                        </span>
+                                    </button>
+                                )}
+                                {!canEditBills && (
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+                                        Ask an Admin to add bills
+                                    </p>
+                                )}
                             </div>
                         ) : (
                             <>
@@ -742,8 +758,12 @@ export default function Planning() {
                                 {/* Segmented Bill Lists */}
                                 {(() => {
                                     const today = startOfDay(new Date());
+                                    const sevenDaysFromNow = new Date(today);
+                                    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+                                    
                                     const overdueBills = bills.filter(b => b.status !== 'paid' && isPast(b.dueDate) && !isToday(b.dueDate));
-                                    const upcomingBills = bills.filter(b => b.status !== 'paid' && (isToday(b.dueDate) || isFuture(b.dueDate)));
+                                    const currentBills = bills.filter(b => b.status !== 'paid' && (isToday(b.dueDate) || (isFuture(b.dueDate) && b.dueDate <= sevenDaysFromNow)));
+                                    const upcomingBills = bills.filter(b => b.status !== 'paid' && isFuture(b.dueDate) && b.dueDate > sevenDaysFromNow);
 
                                     return (
                                         <>
@@ -767,6 +787,42 @@ export default function Planning() {
                                                                     markAsPaid(bill.id, bill.amount);
                                                                     showSuccess('Bill Paid', `${bill.name} marked as paid!`);
                                                                 }}
+                                                                onCommentClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setDiscussingBillId(bill.id);
+                                                                }}
+                                                                commentCount={bill.comments?.length || 0}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {currentBills.length > 0 && (
+                                                <div className="space-y-1.5">
+                                                    <div className="bg-blue-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
+                                                        <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                                                            <span className="material-symbols-outlined text-base">today</span>
+                                                            Current (Next 7 Days)
+                                                        </h3>
+                                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{currentBills.length} Bills</span>
+                                                    </div>
+                                                    <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
+                                                        {currentBills.map(bill => (
+                                                            <CompactBillCard
+                                                                key={bill.id}
+                                                                bill={bill}
+                                                                onClick={() => handleOpenModal(bill as any)}
+                                                                onPayClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    markAsPaid(bill.id, bill.amount);
+                                                                    showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                                }}
+                                                                onCommentClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setDiscussingBillId(bill.id);
+                                                                }}
+                                                                commentCount={bill.comments?.length || 0}
                                                             />
                                                         ))}
                                                     </div>
@@ -792,6 +848,11 @@ export default function Planning() {
                                                                 markAsPaid(bill.id, bill.amount);
                                                                 showSuccess('Bill Paid', `${bill.name} marked as paid!`);
                                                             }}
+                                                            onCommentClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDiscussingBillId(bill.id);
+                                                            }}
+                                                            commentCount={bill.comments?.length || 0}
                                                         />
                                                     ))}
                                                     {upcomingBills.length === 0 && (
@@ -821,7 +882,9 @@ export default function Planning() {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start mb-1">
                                         <h4 className="font-bold text-base text-slate-900 truncate">{source.name}</h4>
-                                        <span className="font-black text-base text-emerald-600">${source.amount.toLocaleString()}</span>
+                                        <span className="font-black text-base text-emerald-600">
+                                            {isAdmin ? `$${source.amount.toLocaleString()}` : '$---'}
+                                        </span>
                                     </div>
                                     <div className="text-xs text-slate-500 font-medium">
                                         <div className="flex items-center gap-2">
@@ -910,6 +973,7 @@ export default function Planning() {
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
                                             placeholder="e.g., Electric, Netflix..."
+                                            disabled={!canEditBills}
                                         />
                                     </div>
                                     <div>
@@ -922,6 +986,7 @@ export default function Planning() {
                                                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                                 className="neo-inset w-full p-3.5 pl-8 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
                                                 placeholder="0.00"
+                                                disabled={!canEditBills}
                                             />
                                         </div>
                                     </div>
@@ -943,6 +1008,7 @@ export default function Planning() {
                                                 key={freq.id}
                                                 type="button"
                                                 onClick={() => {
+                                                    if (!canEditBills) return;
                                                     setFormData({ ...formData, frequency: freq.label });
                                                     const rules: Record<string, { rule: RecurrenceRule, summary: string, dueDay?: number }> = {
                                                         monthly: { rule: { type: 'monthly', byMonthDay: formData.dueDay }, summary: `Monthly on day ${formData.dueDay}` },
@@ -985,13 +1051,14 @@ export default function Planning() {
                                                 <button
                                                     key={day}
                                                     type="button"
+                                                    disabled={!canEditBills}
                                                     onClick={() => {
                                                         setFormData({ ...formData, dueDay: day });
                                                         setRecurrence({ ...recurrence, byMonthDay: day });
                                                         setRecurrenceSummary(recurrenceSummary.replace(/day \d+/, `day ${day}`));
                                                     }}
                                                     className={clsx(
-                                                        "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center",
+                                                        "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed",
                                                         formData.dueDay === day
                                                             ? "bg-primary text-white shadow-md scale-110 ring-2 ring-primary/20"
                                                             : "bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
@@ -1009,7 +1076,12 @@ export default function Planning() {
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Assigned To</label>
                                         <div className="neo-inset px-3 rounded-xl">
-                                            <select value={formData.owner} onChange={(e) => setFormData({ ...formData, owner: e.target.value })} className="w-full py-3.5 text-slate-900 text-sm font-bold bg-transparent border-none focus:outline-none">
+                                            <select
+                                                value={formData.owner}
+                                                onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                                                disabled={!canEditBills}
+                                                className="w-full py-3.5 text-slate-900 text-sm font-bold bg-transparent border-none focus:outline-none disabled:opacity-50"
+                                            >
                                                 <option value="Joint">Joint (Everyone)</option>
                                                 {members.filter(m => m.status === 'active').map(member => (
                                                     <option key={member.id} value={member.name}>{member.name}</option>
@@ -1027,14 +1099,22 @@ export default function Planning() {
                                     </div>
                                     <button
                                         type="button"
+                                        disabled={!canEditBills}
                                         onClick={() => setFormData({ ...formData, isTentative: !formData.isTentative })}
-                                        className={clsx("w-12 h-6 rounded-full p-1 transition-all duration-300 flex items-center", formData.isTentative ? "bg-primary shadow-inner" : "bg-slate-200")}
+                                        className={clsx("w-12 h-6 rounded-full p-1 transition-all duration-300 flex items-center disabled:opacity-50", formData.isTentative ? "bg-primary shadow-inner" : "bg-slate-200")}
                                     >
                                         <div className={clsx("size-4 bg-white rounded-full shadow-sm transition-transform duration-300", formData.isTentative ? "translate-x-6" : "translate-x-0")} />
                                     </button>
                                 </div>
                                 <div className="pt-4 border-t border-gray-100 space-y-3">
-                                    <input type="text" value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Company Name" />
+                                    <input
+                                        type="text"
+                                        value={formData.companyName}
+                                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                                        disabled={!canEditBills}
+                                        className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none disabled:opacity-50"
+                                        placeholder="Company Name"
+                                    />
 
                                     {/* Icon Picker */}
                                     <div>
@@ -1044,9 +1124,10 @@ export default function Planning() {
                                                 <button
                                                     key={emoji}
                                                     type="button"
+                                                    disabled={!canEditBills}
                                                     onClick={() => setFormData({ ...formData, logoUrl: emoji })}
                                                     className={clsx(
-                                                        "size-9 rounded-lg flex items-center justify-center text-xl transition-all",
+                                                        "size-9 rounded-lg flex items-center justify-center text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                                                         formData.logoUrl === emoji
                                                             ? "bg-primary/20 ring-2 ring-primary scale-110"
                                                             : "bg-slate-100 hover:bg-slate-200"
@@ -1058,12 +1139,50 @@ export default function Planning() {
                                         </div>
                                     </div>
 
-                                    <input type="text" value={formData.accountNumber} onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none" placeholder="Account Number" />
-                                    <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none resize-none h-24" placeholder="Notes..."></textarea>
+                                    <input
+                                        type="text"
+                                        value={formData.accountNumber}
+                                        onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                                        disabled={!canEditBills}
+                                        className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none disabled:opacity-50"
+                                        placeholder="Account Number"
+                                    />
+                                    <input
+                                        type="url"
+                                        value={formData.paymentUrl}
+                                        onChange={(e) => setFormData({ ...formData, paymentUrl: e.target.value })}
+                                        disabled={!canEditBills}
+                                        className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none disabled:opacity-50"
+                                        placeholder="Payment URL (e.g., https://pay.company.com)"
+                                    />
+                                    <textarea
+                                        value={formData.notes}
+                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                        disabled={!canEditBills}
+                                        className="neo-inset w-full p-3.5 rounded-xl text-slate-900 text-sm font-bold focus:outline-none resize-none h-24 disabled:opacity-50"
+                                        placeholder="Notes..."
+                                    ></textarea>
                                 </div>
                                 <div className="mt-8 flex gap-3">
-                                    {editingId && <button onClick={handleDeleteBill} className="neo-btn px-5 py-3 rounded-xl text-red-500 font-black uppercase tracking-widest hover:bg-red-50 text-[10px] active:scale-95 transition-all">Eliminate</button>}
-                                    <button onClick={handleSaveBill} className="neo-btn-primary flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all text-white">Confirm Bill</button>
+                                    {editingId && (
+                                        <button
+                                            onClick={handleDeleteBill}
+                                            disabled={!isAdmin} // Only Admins can delete
+                                            className="neo-btn px-5 py-3 rounded-xl text-red-500 font-black uppercase tracking-widest hover:bg-red-50 text-[10px] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Eliminate
+                                        </button>
+                                    )}
+                                    {canEditBills && (
+                                        <button onClick={handleSaveBill} className="neo-btn-primary flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all text-white">
+                                            Confirm Bill
+                                        </button>
+                                    )}
+                                    {!canEditBills && (
+                                        <button disabled className="neo-btn bg-slate-100 flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-400 cursor-not-allowed">
+                                            View Only Mode
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1097,14 +1216,15 @@ export default function Planning() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Amount Per Paycheck</label>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Amount Per Paycheck</label>
                                     <div className="relative">
                                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                                         <input
-                                            type="number"
-                                            value={incomeFormData.amount}
-                                            onChange={(e) => setIncomeFormData({ ...incomeFormData, amount: e.target.value })}
-                                            className="neo-inset w-full p-3.5 pl-8 rounded-xl text-slate-900 text-sm font-bold focus:outline-none"
+                                            type={isAdmin ? "number" : "text"}
+                                            value={isAdmin ? incomeFormData.amount : '---'}
+                                            onChange={(e) => isAdmin && setIncomeFormData({ ...incomeFormData, amount: e.target.value })}
+                                            disabled={!isAdmin}
+                                            className="neo-inset w-full p-3.5 pl-8 rounded-xl text-slate-900 text-sm font-bold focus:outline-none disabled:opacity-60"
                                             placeholder="0.00"
                                         />
                                     </div>
@@ -1124,6 +1244,7 @@ export default function Planning() {
                                         <button
                                             key={freq.id}
                                             type="button"
+                                            disabled={!isAdmin}
                                             onClick={() => {
                                                 setIncomeFormData({ ...incomeFormData, frequencyDisplay: freq.label });
                                                 const rules: Record<string, { rule: RecurrenceRule, summary: string }> = {
@@ -1136,7 +1257,7 @@ export default function Planning() {
                                                 setIncomeRecurrenceSummary(rules[freq.id].summary);
                                             }}
                                             className={clsx(
-                                                "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all",
+                                                "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                                                 incomeFormData.frequencyDisplay === freq.label
                                                     ? "border-primary bg-primary/5"
                                                     : "border-slate-200 hover:border-slate-300"
@@ -1164,11 +1285,12 @@ export default function Planning() {
                                         <button
                                             key={day}
                                             type="button"
+                                            disabled={!isAdmin}
                                             onClick={() => {
                                                 setIncomeFormData({ ...incomeFormData, dueDay: day });
                                             }}
                                             className={clsx(
-                                                "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center",
+                                                "aspect-square rounded-lg text-xs font-bold transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed",
                                                 incomeFormData.dueDay === day
                                                     ? "bg-emerald-600 text-white shadow-md scale-110 ring-2 ring-emerald-600/20"
                                                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
@@ -1188,9 +1310,10 @@ export default function Planning() {
                                         <button
                                             key={emoji}
                                             type="button"
+                                            disabled={!isAdmin}
                                             onClick={() => setIncomeFormData({ ...incomeFormData, logoUrl: emoji })}
                                             className={clsx(
-                                                "size-9 rounded-lg flex items-center justify-center text-xl transition-all",
+                                                "size-9 rounded-lg flex items-center justify-center text-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                                                 incomeFormData.logoUrl === emoji
                                                     ? "bg-primary/20 ring-2 ring-primary scale-110"
                                                     : "bg-slate-100 hover:bg-slate-200"
@@ -1206,22 +1329,33 @@ export default function Planning() {
                         {/* Actions */}
                         <div className="flex gap-3 pt-6">
                             {editingIncomeId && (
-                                <button onClick={handleDeleteIncome} className="neo-btn p-4 rounded-xl text-red-500 hover:bg-red-50">
+                                <button
+                                    onClick={handleDeleteIncome}
+                                    disabled={!isAdmin}
+                                    className="neo-btn p-4 rounded-xl text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
                                     <span className="material-symbols-outlined">delete</span>
                                 </button>
                             )}
-                            <button
-                                onClick={handleSaveIncome}
-                                disabled={!incomeFormData.name || !incomeFormData.amount}
-                                className={clsx(
-                                    "flex-1 p-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all",
-                                    incomeFormData.name && incomeFormData.amount
-                                        ? "neo-btn-primary text-white active:scale-95"
-                                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                )}
-                            >
-                                {editingIncomeId ? 'Save Changes' : 'Add Income'}
-                            </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={handleSaveIncome}
+                                    disabled={!incomeFormData.name || !incomeFormData.amount}
+                                    className={clsx(
+                                        "flex-1 p-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all",
+                                        incomeFormData.name && incomeFormData.amount
+                                            ? "neo-btn-primary text-white active:scale-95"
+                                            : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                    )}
+                                >
+                                    {editingIncomeId ? 'Save Changes' : 'Add Income'}
+                                </button>
+                            )}
+                            {!isAdmin && (
+                                <button disabled className="neo-btn bg-slate-100 flex-1 p-4 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-400 cursor-not-allowed">
+                                    Admin Only
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

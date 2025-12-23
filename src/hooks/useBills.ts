@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, arrayUnion } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { useAuth } from '../context/AuthContext';
+import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, where, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
+import { useGroup } from './useGroup';
 
 // Google Calendar-style recurrence rule
 export interface RecurrenceRule {
@@ -43,20 +44,27 @@ export interface Bill {
     companyName?: string;
     logoUrl?: string; // Custom logo URL (overrides auto-detection)
     website?: string;
+    paymentUrl?: string; // URL to pay the bill online
     username?: string;
     password?: string;
     accountNumber?: string;
     notes?: string;
     comments?: any[];
     householdId?: string;
+    groupId?: string; // Added groupId
     owner?: string; // 'Ernesto' | 'Steph' | 'Joint'
+    history?: any[]; // Payment history
+    lastPaid?: string;
 }
 
 export function useBills() {
+    const { group, canEditBills, canMarkPaid } = useGroup();
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const STORAGE_KEY = 'pchk_bills';
+    const isDemo = user?.email === 'demo@pck2pck.app';
+    const groupId = group?.id;
 
     useEffect(() => {
         if (!user) {
@@ -65,12 +73,11 @@ export function useBills() {
             return;
         }
 
-        // Demo User Logic
-        if ((user as any).isDemo) {
-            const localData = localStorage.getItem(STORAGE_KEY);
-            if (localData) {
+        if (isDemo || !groupId) {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
                 try {
-                    setBills(JSON.parse(localData));
+                    setBills(JSON.parse(stored));
                 } catch (e) {
                     console.error("Failed to parse local bills", e);
                     setBills([]);
@@ -83,7 +90,10 @@ export function useBills() {
         }
 
         // Firestore Logic
-        const q = query(collection(db, 'bills'), where('ownerId', '==', user.uid));
+        const q = query(
+            collection(db, 'bills'),
+            where('groupId', '==', groupId)
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedBills: Bill[] = snapshot.docs.map(doc => ({
@@ -93,10 +103,13 @@ export function useBills() {
 
             setBills(fetchedBills);
             setLoading(false);
+        }, (error) => {
+            console.error('Error fetching bills:', error);
+            setLoading(false);
         });
 
         return () => unsubscribe();
-    }, [user]);
+    }, [user, isDemo, groupId]);
 
     const saveToLocal = (newBills: Bill[]) => {
         setBills(newBills);
@@ -106,7 +119,11 @@ export function useBills() {
     const addBill = async (billData: Omit<Bill, 'id'>) => {
         if (!user) return;
 
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied: You cannot add bills.");
+        }
+
+        if (isDemo || !groupId) {
             const newBill = { ...billData, id: `bill_${Date.now()}` } as Bill;
             saveToLocal([...bills, newBill]);
             return;
@@ -115,8 +132,9 @@ export function useBills() {
         try {
             await addDoc(collection(db, 'bills'), {
                 ...billData,
-                ownerId: user.uid,
-                createdAt: Timestamp.now()
+                groupId: groupId,
+                createdBy: user?.uid,
+                createdAt: serverTimestamp()
             });
         } catch (e) {
             console.error("Failed to add bill:", e);
@@ -124,17 +142,26 @@ export function useBills() {
         }
     };
 
-    const updateBill = async (id: string, data: Partial<Bill>) => {
-        if ((user as any).isDemo) {
-            const updatedBills = bills.map(b => b.id === id ? { ...b, ...data } : b);
+    const updateBill = async (id: string, updates: Partial<Bill>) => {
+        const isStatusUpdateOnly = Object.keys(updates).every(k =>
+            ['status', 'paidDate', 'lastPaid', 'history', 'amount'].includes(k) // Added amount to allowed updates for marking paid
+        );
+
+        if (!canEditBills && !isDemo && !isStatusUpdateOnly) {
+            throw new Error("Permission denied: You cannot edit bill details.");
+        }
+
+        if (isDemo || !groupId) {
+            const updatedBills = bills.map(b => b.id === id ? { ...b, ...updates } : b);
             saveToLocal(updatedBills);
             return;
         }
-        await updateDoc(doc(db, 'bills', id), data);
+        await updateDoc(doc(db, 'bills', id), updates);
     };
 
     const addBillComment = async (id: string, comment: any) => {
-        if ((user as any).isDemo) {
+        // Comments are allowed for now by anyone? Let's assume yes.
+        if (isDemo || !groupId) {
             const updatedBills = bills.map(b => {
                 if (b.id === id) {
                     return { ...b, comments: [...(b.comments || []), comment] };
@@ -149,20 +176,52 @@ export function useBills() {
         });
     };
 
-    const markAsPaid = async (id: string, amountPaid: number) => {
-        if ((user as any).isDemo) {
-            const updatedBills = bills.map(b => b.id === id ? { ...b, status: 'paid', amount: amountPaid } : b);
-            saveToLocal(updatedBills as Bill[]);
+    const markAsPaid = async (billIdOrBill: string | Bill, amountPaid: number, paidDate: Date = new Date()) => {
+        if (!canMarkPaid && !isDemo) {
+            throw new Error("Permission denied.");
+        }
+
+        // Handle both bill ID (string) and bill object
+        const billId = typeof billIdOrBill === 'string' ? billIdOrBill : billIdOrBill.id;
+        const bill = bills.find(b => b.id === billId);
+        
+        if (!bill) {
+            throw new Error(`Bill with ID ${billId} not found`);
+        }
+
+        const newHistoryItem = {
+            date: paidDate.toISOString(),
+            amount: amountPaid,
+            paidBy: user?.displayName || 'User'
+        };
+
+        const updates: any = {
+            status: 'paid',
+            paidDate: paidDate.toISOString(),
+            amount: amountPaid,
+            history: [...(bill.history || []), newHistoryItem],
+            lastPaid: paidDate.toISOString()
+        };
+
+        // Note: Recurrence updating of due date is typically done via a separate "complete" action or inferred.
+        // For now, we just mark this instance as paid. 
+        // Logic for rolling over to next month is in the Planning screen or manual.
+
+        if (isDemo || !groupId) {
+            const updatedBills = bills.map(b => b.id === billId ? { ...b, ...updates } : b);
+            saveToLocal(updatedBills);
             return;
         }
-        await updateDoc(doc(db, 'bills', id), {
-            status: 'paid',
-            amount: amountPaid
-        });
+
+        await updateDoc(doc(db, 'bills', billId), updates);
     };
 
     const batchUpdateBills = async (updates: { id: string, data: Partial<Bill> }[]) => {
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied.");
+        }
+
+        if (isDemo || !groupId) {
             let updatedBills = [...bills];
             updates.forEach(update => {
                 updatedBills = updatedBills.map(b => b.id === update.id ? { ...b, ...update.data } : b);
@@ -171,7 +230,6 @@ export function useBills() {
             return;
         }
 
-        // Parallel execution for Firestore (simplest implementation)
         try {
             await Promise.all(updates.map(update => updateDoc(doc(db, 'bills', update.id), update.data)));
         } catch (e) {
@@ -180,7 +238,11 @@ export function useBills() {
     };
 
     const deleteBill = async (id: string) => {
-        if ((user as any).isDemo) {
+        if (!canEditBills && !isDemo) {
+            throw new Error("Permission denied: You cannot delete bills.");
+        }
+
+        if (isDemo || !groupId) {
             const updatedBills = bills.filter(b => b.id !== id);
             saveToLocal(updatedBills);
             return;
