@@ -93,13 +93,18 @@ export function generateTestBills(count: number = 10): Omit<Bill, 'id'>[] {
 
     for (let i = 0; i < count; i++) {
         const template = BILL_TEMPLATES[i % BILL_TEMPLATES.length];
-        const dayOfMonth = Math.floor(Math.random() * 28) + 1; // 1-28 to avoid month-end issues
-        const dueDate = new Date(currentYear, currentMonth, dayOfMonth);
         
-        // If the due date is in the past, move to next month
-        if (dueDate < today) {
-            dueDate.setMonth(dueDate.getMonth() + 1);
-        }
+        // Create bills with varied due dates to test cycle logic
+        // First half: current cycle (0-14 days)
+        // Second half: next cycle (15-30 days)
+        const isCurrentCycle = i < count / 2;
+        const minDays = isCurrentCycle ? 0 : 15;
+        const maxDays = isCurrentCycle ? 14 : 30;
+        const daysAhead = Math.floor(Math.random() * (maxDays - minDays + 1)) + minDays;
+        
+        const dueDate = new Date(today);
+        dueDate.setDate(today.getDate() + daysAhead);
+        const dayOfMonth = dueDate.getDate();
 
         const recurrence = generateMonthlyRecurrence(dayOfMonth);
         
@@ -115,6 +120,9 @@ export function generateTestBills(count: number = 10): Omit<Bill, 'id'>[] {
         } else {
             status = 'upcoming';
         }
+        
+        // Determine cycle based on days ahead
+        const cycle: 'current' | 'next' = daysAhead <= 14 ? 'current' : 'next';
 
         bills.push({
             name: template.name,
@@ -126,7 +134,7 @@ export function generateTestBills(count: number = 10): Omit<Bill, 'id'>[] {
             icon: template.icon,
             category: template.category,
             paycheckLabel: 'Unassigned',
-            cycle: 'current',
+            cycle,
             recurrence,
             recurrenceSummary: `Monthly on day ${dayOfMonth}`,
             frequency: 'Monthly',

@@ -162,7 +162,7 @@ export default function Planning() {
         // Use the nearest upcoming paycheck date as cycle boundary
         const upcomingPaychecks = incomeSources
             .map(source => {
-                const nextPayDate = new Date(source.nextPayDate);
+                const nextPayDate = new Date(source.nextPayday);
                 return nextPayDate;
             })
             .filter(date => date >= today)
@@ -792,9 +792,18 @@ export default function Planning() {
 
                                 {/* Cycle-Based Bill Lists */}
                                 {(() => {
-                                    // Filter bills by cycle
-                                    const currentCycleBills = bills.filter(b => b.status !== 'paid' && b.cycle === 'current');
-                                    const upcomingCycleBills = bills.filter(b => b.status !== 'paid' && b.cycle === 'next');
+                                    // Dynamically determine cycle for each bill (don't rely on stored value)
+                                    const currentCycleBills = bills.filter(b => {
+                                        if (b.status === 'paid') return false;
+                                        const billCycle = determineBillCycle(b.dueDate);
+                                        return billCycle === 'current';
+                                    });
+                                    
+                                    const upcomingCycleBills = bills.filter(b => {
+                                        if (b.status === 'paid') return false;
+                                        const billCycle = determineBillCycle(b.dueDate);
+                                        return billCycle === 'next';
+                                    });
                                     
                                     // Further categorize current cycle bills by urgency
                                     const today = startOfDay(new Date());
