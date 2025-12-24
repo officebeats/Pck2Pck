@@ -61,28 +61,39 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
     if (!timeRemaining) return null;
 
-    // Determine urgency level for styling
+    // Enhanced urgency levels with UX best practices
+    // Progressive color coding provides clear visual hierarchy
     const getUrgencyLevel = () => {
         if (timeRemaining.isOverdue) return 'overdue';
-        if (timeRemaining.totalSeconds < 86400) return 'critical'; // < 1 day
-        if (timeRemaining.totalSeconds < 259200) return 'warning'; // < 3 days
-        return 'normal';
+        const totalHours = timeRemaining.totalSeconds / 3600;
+        
+        if (totalHours < 12) return 'critical';    // < 12 hours - Immediate action needed
+        if (totalHours < 24) return 'urgent';      // < 1 day - Action needed soon
+        if (totalHours < 72) return 'warning';     // < 3 days - Plan ahead
+        if (totalHours < 168) return 'attention';  // < 7 days - Be aware
+        return 'normal';                            // 7+ days - No urgency
     };
 
     const urgency = getUrgencyLevel();
 
+    // Progressive color system following UX best practices
+    // Red → Orange → Amber → Yellow → Green
     const urgencyStyles = {
-        overdue: 'text-red-600 bg-red-50',
-        critical: 'text-orange-600 bg-orange-50',
-        warning: 'text-amber-600 bg-amber-50',
-        normal: 'text-slate-600 bg-slate-50'
+        overdue: 'text-red-700 bg-red-100 border-red-200',
+        critical: 'text-orange-700 bg-orange-100 border-orange-200',
+        urgent: 'text-amber-700 bg-amber-100 border-amber-200',
+        warning: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+        attention: 'text-blue-700 bg-blue-50 border-blue-200',
+        normal: 'text-emerald-700 bg-emerald-50 border-emerald-200'
     };
 
     const iconStyles = {
-        overdue: 'text-red-500',
-        critical: 'text-orange-500',
-        warning: 'text-amber-500',
-        normal: 'text-slate-400'
+        overdue: 'text-red-600',
+        critical: 'text-orange-600',
+        urgent: 'text-amber-600',
+        warning: 'text-yellow-600',
+        attention: 'text-blue-600',
+        normal: 'text-emerald-600'
     };
 
     if (compact) {
@@ -90,7 +101,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
             <div className={clsx(
                 'flex items-center gap-1 text-[10px] font-black uppercase tracking-wider',
                 urgencyStyles[urgency],
-                'px-2 py-0.5 rounded-md',
+                'px-2 py-0.5 rounded-md border',
                 className
             )}>
                 {showIcon && (
@@ -100,7 +111,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
                 )}
                 <span className="tabular-nums">
                     {timeRemaining.isOverdue && '⚠️ '}
-                    {timeRemaining.days}d {timeRemaining.hours.toString().padStart(2, '0')}h {timeRemaining.minutes.toString().padStart(2, '0')}m {timeRemaining.seconds.toString().padStart(2, '0')}s
+                    {timeRemaining.days} {timeRemaining.days === 1 ? 'day' : 'days'}
                 </span>
             </div>
         );
@@ -108,7 +119,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
     return (
         <div className={clsx(
-            'flex flex-col items-center gap-1 p-2 rounded-lg',
+            'flex flex-col items-center gap-1 p-2 rounded-lg border',
             urgencyStyles[urgency],
             className
         )}>
@@ -117,26 +128,11 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
                     {timeRemaining.isOverdue ? 'priority_high' : 'schedule'}
                 </span>
             )}
-            <div className="flex items-center gap-2">
-                <div className="flex flex-col items-center">
-                    <span className="text-2xl font-black tabular-nums">{timeRemaining.days}</span>
-                    <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">Days</span>
-                </div>
-                <span className="text-xl font-black opacity-50">:</span>
-                <div className="flex flex-col items-center">
-                    <span className="text-2xl font-black tabular-nums">{timeRemaining.hours.toString().padStart(2, '0')}</span>
-                    <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">Hrs</span>
-                </div>
-                <span className="text-xl font-black opacity-50">:</span>
-                <div className="flex flex-col items-center">
-                    <span className="text-2xl font-black tabular-nums">{timeRemaining.minutes.toString().padStart(2, '0')}</span>
-                    <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">Min</span>
-                </div>
-                <span className="text-xl font-black opacity-50">:</span>
-                <div className="flex flex-col items-center">
-                    <span className="text-2xl font-black tabular-nums">{timeRemaining.seconds.toString().padStart(2, '0')}</span>
-                    <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">Sec</span>
-                </div>
+            <div className="flex flex-col items-center">
+                <span className="text-2xl font-black tabular-nums">{timeRemaining.days}</span>
+                <span className="text-[8px] font-bold uppercase tracking-widest opacity-70">
+                    {timeRemaining.days === 1 ? 'Day' : 'Days'}
+                </span>
             </div>
             {timeRemaining.isOverdue && (
                 <span className="text-[9px] font-black uppercase tracking-widest text-red-600">

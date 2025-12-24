@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import CompanyLogo from './CompanyLogo';
 import { Bill } from '@/hooks/useBills';
 import { differenceInCalendarDays, parseISO, isPast, isToday } from 'date-fns';
+import CountdownTimer from './CountdownTimer';
 
 interface CompactBillCardProps {
     bill: any; // Using any to handle both Firestore Bill and UIBill from Planning.tsx
@@ -92,12 +93,12 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
 
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 overflow-hidden">
-                        <span className={clsx(
-                            "text-[9px] font-black uppercase tracking-widest whitespace-nowrap",
-                            statusConfig.text
-                        )}>
-                            {statusConfig.label}
-                        </span>
+                        <CountdownTimer 
+                            targetDate={dueDate}
+                            compact={true}
+                            showIcon={false}
+                            className="!text-[9px] !px-1.5 !py-0.5"
+                        />
                         <span className="text-slate-300 text-[9px]">•</span>
                         <span className="text-[9px] font-bold text-slate-400 truncate uppercase tracking-tighter">
                             {bill.category}

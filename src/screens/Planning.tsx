@@ -148,6 +148,41 @@ export default function Planning() {
         })).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
     }, [firestoreBills]);
 
+    // Helper function to determine bill cycle based on due date
+    const determineBillCycle = (dueDate: Date): 'current' | 'next' | 'previous' => {
+        const today = startOfDay(new Date());
+        const billDueDate = startOfDay(dueDate);
+        
+        // If bill is past due, it's in current cycle
+        if (billDueDate < today) {
+            return 'current';
+        }
+        
+        // Determine current cycle end date based on income sources
+        // Use the nearest upcoming paycheck date as cycle boundary
+        const upcomingPaychecks = incomeSources
+            .map(source => {
+                const nextPayDate = new Date(source.nextPayDate);
+                return nextPayDate;
+            })
+            .filter(date => date >= today)
+            .sort((a, b) => a.getTime() - b.getTime());
+        
+        // If we have upcoming paychecks, use the first one as cycle boundary
+        // Otherwise, use a 14-day window as default
+        const cycleEndDate = upcomingPaychecks.length > 0 
+            ? upcomingPaychecks[0]
+            : new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+        
+        // Bill is in current cycle if due before next paycheck
+        if (billDueDate <= cycleEndDate) {
+            return 'current';
+        }
+        
+        // Otherwise it's in the next cycle
+        return 'next';
+    };
+
     // --- View State ---
     const location = useLocation();
     const [viewMode, setViewMode] = useState<'bills' | 'income'>(() => {
@@ -456,7 +491,7 @@ export default function Planning() {
             frequency: recurrenceSummary,
             dueDate: dueDate.toISOString(),
             dueDateIso: dueDate.toISOString(),
-            cycle: 'current' as const,
+            cycle: determineBillCycle(dueDate),
             paycheckLabel: 'Unassigned',
             category: formData.category || 'General',
             icon: formData.icon,
@@ -755,117 +790,130 @@ export default function Planning() {
                                     );
                                 })()}
 
-                                {/* Segmented Bill Lists */}
+                                {/* Cycle-Based Bill Lists */}
                                 {(() => {
-                                    const today = startOfDay(new Date());
-                                    const sevenDaysFromNow = new Date(today);
-                                    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+                                    // Filter bills by cycle
+                                    const currentCycleBills = bills.filter(b => b.status !== 'paid' && b.cycle === 'current');
+                                    const upcomingCycleBills = bills.filter(b => b.status !== 'paid' && b.cycle === 'next');
                                     
-                                    const overdueBills = bills.filter(b => b.status !== 'paid' && isPast(b.dueDate) && !isToday(b.dueDate));
-                                    const currentBills = bills.filter(b => b.status !== 'paid' && (isToday(b.dueDate) || (isFuture(b.dueDate) && b.dueDate <= sevenDaysFromNow)));
-                                    const upcomingBills = bills.filter(b => b.status !== 'paid' && isFuture(b.dueDate) && b.dueDate > sevenDaysFromNow);
+                                    // Further categorize current cycle bills by urgency
+                                    const today = startOfDay(new Date());
+                                    const overdueBills = currentCycleBills.filter(b => isPast(b.dueDate) && !isToday(b.dueDate));
+                                    const dueSoonBills = currentCycleBills.filter(b => isToday(b.dueDate) || !isPast(b.dueDate));
 
                                     return (
                                         <>
-                                            {overdueBills.length > 0 && (
-                                                <div className="space-y-1.5">
-                                                    <div className="bg-red-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
-                                                        <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-                                                            <span className="material-symbols-outlined text-base">warning</span>
-                                                            Overdue
-                                                        </h3>
-                                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{overdueBills.length} Bills</span>
-                                                    </div>
-                                                    <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
-                                                        {overdueBills.map(bill => (
-                                                            <CompactBillCard
-                                                                key={bill.id}
-                                                                bill={bill}
-                                                                onClick={() => handleOpenModal(bill as any)}
-                                                                onPayClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    markAsPaid(bill.id, bill.amount);
-                                                                    showSuccess('Bill Paid', `${bill.name} marked as paid!`);
-                                                                }}
-                                                                onCommentClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setDiscussingBillId(bill.id);
-                                                                }}
-                                                                commentCount={bill.comments?.length || 0}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {currentBills.length > 0 && (
-                                                <div className="space-y-1.5">
-                                                    <div className="bg-blue-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
-                                                        <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-                                                            <span className="material-symbols-outlined text-base">today</span>
-                                                            Current (Next 7 Days)
-                                                        </h3>
-                                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{currentBills.length} Bills</span>
-                                                    </div>
-                                                    <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
-                                                        {currentBills.map(bill => (
-                                                            <CompactBillCard
-                                                                key={bill.id}
-                                                                bill={bill}
-                                                                onClick={() => handleOpenModal(bill as any)}
-                                                                onPayClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    markAsPaid(bill.id, bill.amount);
-                                                                    showSuccess('Bill Paid', `${bill.name} marked as paid!`);
-                                                                }}
-                                                                onCommentClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setDiscussingBillId(bill.id);
-                                                                }}
-                                                                commentCount={bill.comments?.length || 0}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
+                                            {/* Current Cycle Section */}
                                             <div className="space-y-1.5">
-                                                <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
+                                                <div className="bg-blue-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
                                                     <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-                                                        <span className="material-symbols-outlined text-base">calendar_month</span>
-                                                        Upcoming
+                                                        <span className="material-symbols-outlined text-base">event_available</span>
+                                                        Current Cycle
                                                     </h3>
-                                                    <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{upcomingBills.length} Bills</span>
+                                                    <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{currentCycleBills.length} Bills</span>
                                                 </div>
                                                 <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
-                                                    {upcomingBills.map(bill => (
-                                                        <CompactBillCard
-                                                            key={bill.id}
-                                                            bill={bill}
-                                                            onClick={() => handleOpenModal(bill as any)}
-                                                            onPayClick={(e) => {
-                                                                e.stopPropagation();
-                                                                markAsPaid(bill.id, bill.amount);
-                                                                showSuccess('Bill Paid', `${bill.name} marked as paid!`);
-                                                            }}
-                                                            onCommentClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setDiscussingBillId(bill.id);
-                                                            }}
-                                                            commentCount={bill.comments?.length || 0}
-                                                        />
-                                                    ))}
-                                                    {upcomingBills.length === 0 && (
+                                                    {overdueBills.length > 0 && (
+                                                        <>
+                                                            <div className="bg-red-50 px-3 py-1 border-b border-red-100">
+                                                                <p className="text-[9px] font-black uppercase tracking-widest text-red-600 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-xs">warning</span>
+                                                                    Overdue ({overdueBills.length})
+                                                                </p>
+                                                            </div>
+                                                            {overdueBills.map(bill => (
+                                                                <CompactBillCard
+                                                                    key={bill.id}
+                                                                    bill={bill}
+                                                                    onClick={() => handleOpenModal(bill as any)}
+                                                                    onPayClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        markAsPaid(bill.id, bill.amount);
+                                                                        showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                                    }}
+                                                                    onCommentClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDiscussingBillId(bill.id);
+                                                                    }}
+                                                                    commentCount={bill.comments?.length || 0}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                    
+                                                    {dueSoonBills.length > 0 && (
+                                                        <>
+                                                            {overdueBills.length > 0 && (
+                                                                <div className="bg-slate-50 px-3 py-1 border-b border-slate-100">
+                                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-xs">schedule</span>
+                                                                        Due Soon ({dueSoonBills.length})
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            {dueSoonBills.map(bill => (
+                                                                <CompactBillCard
+                                                                    key={bill.id}
+                                                                    bill={bill}
+                                                                    onClick={() => handleOpenModal(bill as any)}
+                                                                    onPayClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        markAsPaid(bill.id, bill.amount);
+                                                                        showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                                    }}
+                                                                    onCommentClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDiscussingBillId(bill.id);
+                                                                    }}
+                                                                    commentCount={bill.comments?.length || 0}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                    
+                                                    {currentCycleBills.length === 0 && (
                                                         <div className="p-10 flex flex-col items-center justify-center text-center">
                                                             <div className="neo-inset p-4 rounded-full mb-3">
-                                                                <span className="material-symbols-outlined text-3xl text-emerald-400">celebration</span>
+                                                                <span className="material-symbols-outlined text-3xl text-blue-400">celebration</span>
                                                             </div>
-                                                            <p className="text-sm font-bold text-slate-700 mb-1">You're all caught up!</p>
-                                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">No bills due this period</p>
+                                                            <p className="text-sm font-bold text-slate-700 mb-1">All caught up!</p>
+                                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">No bills due this cycle</p>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Upcoming Cycle Section */}
+                                            {upcomingCycleBills.length > 0 && (
+                                                <div className="space-y-1.5">
+                                                    <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-t-xl flex items-center justify-between shadow-sm">
+                                                        <h3 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+                                                            <span className="material-symbols-outlined text-base">event_upcoming</span>
+                                                            Upcoming Cycle
+                                                        </h3>
+                                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-bold">{upcomingCycleBills.length} Bills</span>
+                                                    </div>
+                                                    <div className="bg-white rounded-b-xl shadow-lg border border-slate-100 overflow-hidden divide-y divide-slate-100 mt-0">
+                                                        {upcomingCycleBills.map(bill => (
+                                                            <CompactBillCard
+                                                                key={bill.id}
+                                                                bill={bill}
+                                                                onClick={() => handleOpenModal(bill as any)}
+                                                                onPayClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    markAsPaid(bill.id, bill.amount);
+                                                                    showSuccess('Bill Paid', `${bill.name} marked as paid!`);
+                                                                }}
+                                                                onCommentClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setDiscussingBillId(bill.id);
+                                                                }}
+                                                                commentCount={bill.comments?.length || 0}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </>
                                     );
                                 })()}

@@ -2,7 +2,6 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { useBills } from '@/hooks/useBills';
 import ToastProvider from '@/components/Toast';
 
 // Lazy Load Screens
@@ -12,7 +11,6 @@ const Dashboard = lazy(() => import('./screens/Dashboard'));
 const RecurringExpenses = lazy(() => import('./screens/RecurringExpenses'));
 const Notifications = lazy(() => import('./screens/Notifications'));
 const BillDiscussion = lazy(() => import('./screens/BillDiscussion'));
-const BillPayments = lazy(() => import('./screens/BillPayments'));
 const IncomeSources = lazy(() => import('./screens/IncomeSources'));
 const MemberProfile = lazy(() => import('./screens/MemberProfile'));
 const Planning = lazy(() => import('./screens/Planning'));
@@ -23,9 +21,7 @@ const Settings = lazy(() => import('./screens/Settings'));
  */
 const NavLinks = [
   { path: '/home', label: 'Home', icon: 'dashboard' },
-  { path: '/bills', label: 'Bills', icon: 'payments' },
   { path: '/planning', label: 'Planner', icon: 'calendar_month' },
-
   { path: '/notifications', label: 'Alerts', icon: 'notifications' },
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
@@ -36,7 +32,6 @@ const NavLinks = [
 const Sidebar = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { bills } = useBills(); // Fetch bills for navigation visibility
 
   // Create safe user display values
   const displayName = user?.displayName || 'User';
@@ -57,12 +52,7 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 px-4 space-y-3 overflow-y-auto py-4">
-        {NavLinks.filter(link => {
-          if (link.label === 'Bills') {
-            return bills.length > 0;
-          }
-          return true;
-        }).map((link) => {
+        {NavLinks.map((link) => {
           const isActive = location.pathname === link.path && !location.search;
 
           return (
@@ -115,23 +105,14 @@ const BottomNav = () => {
   const location = useLocation();
   const mobileTabs = [
     { path: '/home', label: 'Home', icon: 'dashboard' },
-    { path: '/bills', label: 'Bills', icon: 'payments' },
     { path: '/planning', label: 'Planner', icon: 'calendar_month' },
-
     { path: '/settings', label: 'Settings', icon: 'settings' },
   ];
-
-  const { bills } = useBills();
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background-light/95 Backdrop-blur-md border-t border-white/40 z-50 safe-area-bottom pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
       <div className="flex justify-around items-center h-16 px-4">
-        {mobileTabs.filter(tab => {
-          if (tab.label === 'Bills') {
-            return bills.length > 0;
-          }
-          return true;
-        }).map((tab) => {
+        {mobileTabs.map((tab) => {
           const isActive = location.pathname === tab.path;
           return (
             <Link
@@ -235,7 +216,7 @@ function AppContent() {
 
                   <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                   <Route path="/bill-discussion" element={<ProtectedRoute><BillDiscussion /></ProtectedRoute>} />
-                  <Route path="/bills" element={<ProtectedRoute><BillPayments /></ProtectedRoute>} />
+                  {/* Bills route removed - functionality moved to Planning screen */}
                   <Route path="/income" element={<ProtectedRoute><IncomeSources /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                   <Route path="/member/:id" element={<ProtectedRoute><MemberProfile /></ProtectedRoute>} />
