@@ -61,39 +61,34 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
     if (!timeRemaining) return null;
 
-    // Enhanced urgency levels with UX best practices
-    // Progressive color coding provides clear visual hierarchy
+    // Match urgency levels with CompactBillCard status indicator
     const getUrgencyLevel = () => {
-        if (timeRemaining.isOverdue) return 'overdue';
+        if (timeRemaining.isOverdue) return 'critical';
         const totalHours = timeRemaining.totalSeconds / 3600;
         
-        if (totalHours < 12) return 'critical';    // < 12 hours - Immediate action needed
-        if (totalHours < 24) return 'urgent';      // < 1 day - Action needed soon
-        if (totalHours < 72) return 'warning';     // < 3 days - Plan ahead
-        if (totalHours < 168) return 'attention';  // < 7 days - Be aware
-        return 'normal';                            // 7+ days - No urgency
+        // Critical: overdue or due today
+        if (totalHours < 24) return 'critical';
+        
+        // Warning: 3 days or less
+        if (totalHours <= 72) return 'warning';
+        
+        // Stable: more than 3 days
+        return 'stable';
     };
 
     const urgency = getUrgencyLevel();
 
-    // Progressive color system following UX best practices
-    // Red → Orange → Amber → Yellow → Green
+    // Match exact colors from CompactBillCard status indicator
     const urgencyStyles = {
-        overdue: 'text-red-700 bg-red-100 border-red-200',
-        critical: 'text-orange-700 bg-orange-100 border-orange-200',
-        urgent: 'text-amber-700 bg-amber-100 border-amber-200',
-        warning: 'text-yellow-700 bg-yellow-50 border-yellow-200',
-        attention: 'text-blue-700 bg-blue-50 border-blue-200',
-        normal: 'text-emerald-700 bg-emerald-50 border-emerald-200'
+        critical: 'text-red-700 bg-red-100 border-red-200',
+        warning: 'text-amber-700 bg-amber-100 border-amber-200',
+        stable: 'text-emerald-700 bg-emerald-100 border-emerald-200'
     };
 
     const iconStyles = {
-        overdue: 'text-red-600',
-        critical: 'text-orange-600',
-        urgent: 'text-amber-600',
-        warning: 'text-yellow-600',
-        attention: 'text-blue-600',
-        normal: 'text-emerald-600'
+        critical: 'text-red-600',
+        warning: 'text-amber-600',
+        stable: 'text-emerald-600'
     };
 
     if (compact) {

@@ -99,10 +99,6 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
                             showIcon={false}
                             className="!text-[9px] !px-1.5 !py-0.5"
                         />
-                        <span className="text-slate-300 text-[9px]">•</span>
-                        <span className="text-[9px] font-bold text-slate-400 truncate uppercase tracking-tighter">
-                            {bill.category}
-                        </span>
                     </div>
                 </div>
             </div>

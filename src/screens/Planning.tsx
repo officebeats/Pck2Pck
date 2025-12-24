@@ -493,7 +493,7 @@ export default function Planning() {
             dueDateIso: dueDate.toISOString(),
             cycle: determineBillCycle(dueDate),
             paycheckLabel: 'Unassigned',
-            category: formData.category || 'General',
+            category: formData.category,
             icon: formData.icon,
             dueDay: recurrence.byMonthDay || formData.dueDay,
             dueMonth: formData.dueMonth,
