@@ -60,7 +60,9 @@ const getDueCountdown = (dueDate: Date): { label: string, isUrgent: boolean, isD
         return { label: 'Due Today', isUrgent: true, isDueToday: true };
     } else if (diffDays === 1) {
         return { label: 'Due Tomorrow', isUrgent: true, isDueToday: false };
-    } else if (diffDays <= 7) {
+    } else if (diffDays <= 3) {
+        return { label: `${diffDays}d left`, isUrgent: true, isDueToday: false };
+    } else if (diffDays <= 14) {
         return { label: `${diffDays}d left`, isUrgent: false, isDueToday: false };
     } else {
         return { label: `${diffDays}d left`, isUrgent: false, isDueToday: false };

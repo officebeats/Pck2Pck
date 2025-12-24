@@ -71,8 +71,11 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
         
         // Warning: 3 days or less
         if (totalHours <= 72) return 'warning';
+
+        // Attention: 14 days or less
+        if (totalHours <= 336) return 'attention';
         
-        // Stable: more than 3 days
+        // Stable: more than 14 days
         return 'stable';
     };
 
@@ -82,12 +85,14 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     const urgencyStyles = {
         critical: 'text-red-700 bg-red-100 border-red-200',
         warning: 'text-amber-700 bg-amber-100 border-amber-200',
+        attention: 'text-blue-700 bg-blue-100 border-blue-200',
         stable: 'text-emerald-700 bg-emerald-100 border-emerald-200'
     };
 
     const iconStyles = {
         critical: 'text-red-600',
         warning: 'text-amber-600',
+        attention: 'text-blue-600',
         stable: 'text-emerald-600'
     };
 

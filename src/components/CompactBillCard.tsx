@@ -28,7 +28,7 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
     const isDueToday = isToday(dueDate);
 
     // Urgency level for color coding
-    const urgency = isOverdue || isDueToday ? 'critical' : daysRemaining <= 3 ? 'warning' : 'stable';
+    const urgency = isOverdue || isDueToday ? 'critical' : daysRemaining <= 3 ? 'warning' : daysRemaining <= 14 ? 'attention' : 'stable';
 
     const statusConfig = {
         critical: {
@@ -43,6 +43,13 @@ export const CompactBillCard: React.FC<CompactBillCardProps> = ({ bill, onClick,
             text: 'text-amber-600',
             bg: 'bg-amber-50/30',
             border: 'border-amber-100',
+            label: `Due in ${daysRemaining}d`
+        },
+        attention: {
+            badge: 'bg-blue-500',
+            text: 'text-blue-600',
+            bg: 'bg-blue-50/30',
+            border: 'border-blue-100',
             label: `Due in ${daysRemaining}d`
         },
         stable: {
