@@ -5,6 +5,8 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import clsx from 'clsx';
 
+import { loadTestDataToLocalStorage } from '../utils/testDataGenerator';
+
 export default function SignIn() {
   const { signInWithGoogle, loginWithDemo, user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,8 @@ export default function SignIn() {
     e.preventDefault();
     setLoading(true);
     try {
+      // Initialize demo data before logging in
+      loadTestDataToLocalStorage();
       await loginWithDemo(demoEmail);
     } catch (e) {
       console.log(e);
