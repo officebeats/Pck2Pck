@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import './utils/testDataGenerator'; // Make test data generator available in console
+import './utils/cleanupDemoData'; // Make cleanup script available in console
 
 // Register service worker
 const updateSW = registerSW({
